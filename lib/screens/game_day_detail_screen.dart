@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/screens/chip_settlement_screen.dart';
+import 'package:majan_log_app/utils/sit_out_rotation.dart';
 
 class GameDayDetailScreen extends ConsumerStatefulWidget {
   final int gameDayId;
@@ -47,8 +48,20 @@ class _GameDayDetailScreenState
             if (!snapshot.hasData) return const Text('...');
             final gd = snapshot.data!;
             final typeStr = gd.playerCount == 3 ? '三麻' : '四麻';
-            return Text(
-                '${gd.date.year}/${gd.date.month}/${gd.date.day} ($typeStr)');
+            return StreamBuilder<List<GameDayPlayer>>(
+              stream: (db.select(db.gameDayPlayers)
+                    ..where(
+                        (t) => t.gameDayId.equals(widget.gameDayId)))
+                  .watch(),
+              builder: (context, playersSnap) {
+                final n = playersSnap.data?.length;
+                final suffix = (n != null && n > gd.playerCount)
+                    ? '・$n人'
+                    : '';
+                return Text(
+                    '${gd.date.year}/${gd.date.month}/${gd.date.day} ($typeStr$suffix)');
+              },
+            );
           },
         ),
         bottom: TabBar(
@@ -158,7 +171,8 @@ class _ScoreTab extends ConsumerWidget {
       innerJoin(db.gameDayPlayers,
           db.gameDayPlayers.playerId.equalsExp(db.players.id)),
     ])
-      ..where(db.gameDayPlayers.gameDayId.equals(gameDayId));
+      ..where(db.gameDayPlayers.gameDayId.equals(gameDayId))
+      ..orderBy([OrderingTerm.asc(db.gameDayPlayers.id)]);
 
     return query.watch().map(
         (rows) => rows.map((r) => r.readTable(db.players)).toList());
@@ -167,6 +181,8 @@ class _ScoreTab extends ConsumerWidget {
   Widget _buildScoreTable(BuildContext context, AppDatabase db,
       GameDay gameDay, List<Player> players, List<Game> games,
       List<GameScore> allScores) {
+    final seatCount = gameDay.playerCount;
+    final hasSitOut = players.length > seatCount;
     final gameIds = games.map((g) => g.id).toSet();
     final scores =
         allScores.where((s) => gameIds.contains(s.gameId)).toList();
@@ -210,6 +226,18 @@ class _ScoreTab extends ConsumerWidget {
       padding: const EdgeInsets.all(8),
       child: ListView(
         children: [
+          if (hasSitOut)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '参加者${players.length}人 / 席$seatCount人'
+                '（休みは半荘ごとにローテ・「休」表示）',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
           Table(
             border: TableBorder.all(color: Colors.grey.shade400),
             columnWidths: colWidths,
@@ -237,17 +265,27 @@ class _ScoreTab extends ConsumerWidget {
                               s.gameId == game.id &&
                               s.playerId == p.id)
                           .firstOrNull;
-                      final value = score?.score ?? 0;
+                      final sittingOut =
+                          hasSitOut && score == null;
                       return GestureDetector(
                         onLongPress: () =>
                             _showDeleteGameDialog(
                                 context, db, game),
-                        child: cell(
-                          value >= 0 ? '+$value' : '$value',
-                          color: value >= 0
-                              ? Colors.black
-                              : Colors.red,
-                        ),
+                        child: sittingOut
+                            ? cell('休',
+                                color: Colors.grey.shade600,
+                                bg: Colors.grey.shade100)
+                            : cell(
+                                () {
+                                  final value = score?.score ?? 0;
+                                  return value >= 0
+                                      ? '+$value'
+                                      : '$value';
+                                }(),
+                                color: (score?.score ?? 0) >= 0
+                                    ? Colors.black
+                                    : Colors.red,
+                              ),
                       );
                     }),
                   ],
@@ -296,8 +334,8 @@ class _ScoreTab extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: () =>
-                _showAddScoreDialog(context, db, players, games),
+            onPressed: () => _showAddScoreDialog(
+                context, db, gameDay, players, games),
             icon: const Icon(Icons.add),
             label: const Text('半荘を追加'),
           ),
@@ -317,8 +355,22 @@ class _ScoreTab extends ConsumerWidget {
     return '$abs';
   }
 
-  void _showAddScoreDialog(BuildContext context, AppDatabase db,
-      List<Player> players, List<Game> games) {
+  void _showAddScoreDialog(
+      BuildContext context,
+      AppDatabase db,
+      GameDay gameDay,
+      List<Player> players,
+      List<Game> games) {
+    final seatCount = gameDay.playerCount;
+    final gameNumber = games.length + 1;
+    final participantIds = players.map((p) => p.id).toList();
+    final defaultSitOut = defaultSittingOutPlayerIds(
+      participantIds: participantIds,
+      seatCount: seatCount,
+      gameNumber: gameNumber,
+    );
+    final sittingOutIds = Set<int>.from(defaultSitOut);
+
     final controllers = <int, TextEditingController>{};
     final focusNodes = <int, FocusNode>{};
     for (final p in players) {
@@ -330,22 +382,28 @@ class _ScoreTab extends ConsumerWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final seated = seatedPlayerIds(
+            participantIds: participantIds,
+            sittingOutIds: sittingOutIds,
+          );
+          final excess = players.length - seatCount;
+          final canSave = seated.length == seatCount;
+
           void autoCalcLast() {
             final filled = <int, int>{};
             int? emptyPlayerId;
             int emptyCount = 0;
-            for (final entry in controllers.entries) {
-              final text = entry.value.text.trim();
+            for (final id in seated) {
+              final text = controllers[id]!.text.trim();
               if (text.isEmpty) {
-                emptyPlayerId = entry.key;
+                emptyPlayerId = id;
                 emptyCount++;
               } else {
-                filled[entry.key] =
-                    int.tryParse(text) ?? 0;
+                filled[id] = int.tryParse(text) ?? 0;
               }
             }
             if (emptyCount == 1 &&
-                filled.length == players.length - 1 &&
+                filled.length == seated.length - 1 &&
                 emptyPlayerId != null) {
               final sum =
                   filled.values.fold<int>(0, (a, b) => a + b);
@@ -353,40 +411,105 @@ class _ScoreTab extends ConsumerWidget {
             }
           }
 
-          for (final p in players) {
-            focusNodes[p.id]!.addListener(() {
-              if (!focusNodes[p.id]!.hasFocus) {
-                autoCalcLast();
-              }
-            });
-          }
-
           return AlertDialog(
-            title: Text('半荘 ${games.length + 1}'),
+            title: Text('半荘 $gameNumber'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: players.map((p) {
-                  return Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 4),
-                    child: TextField(
-                      controller: controllers[p.id],
-                      focusNode: focusNodes[p.id],
-                      decoration: InputDecoration(
-                        labelText: p.name,
-                        border: const OutlineInputBorder(),
-                      ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(
-                              signed: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'^-?\d*')),
-                      ],
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (excess > 0) ...[
+                    const Text('休み（タップで変更）',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      children: players.map((p) {
+                        final resting =
+                            sittingOutIds.contains(p.id);
+                        return FilterChip(
+                          label: Text(p.name),
+                          selected: resting,
+                          onSelected: (value) {
+                            setDialogState(() {
+                              if (value) {
+                                if (sittingOutIds.length <
+                                    excess) {
+                                  sittingOutIds.add(p.id);
+                                  controllers[p.id]!.clear();
+                                } else if (sittingOutIds
+                                        .length ==
+                                    excess) {
+                                  // 枠がいっぱいなら入れ替え: 先に入っていた1人を外す
+                                  sittingOutIds
+                                      .remove(sittingOutIds.first);
+                                  sittingOutIds.add(p.id);
+                                  controllers[p.id]!.clear();
+                                }
+                              } else {
+                                sittingOutIds.remove(p.id);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
                     ),
-                  );
-                }).toList(),
+                    if (!canSave)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '休みはちょうど $excess 人選んでください'
+                          '（卓は $seatCount 人）',
+                          style: const TextStyle(
+                              color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                  ],
+                  ...players.map((p) {
+                    final resting =
+                        sittingOutIds.contains(p.id);
+                    if (resting) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 4),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: '${p.name}（休み）',
+                            border: const OutlineInputBorder(),
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                          ),
+                          child: Text('休',
+                              style: TextStyle(
+                                  color: Colors.grey.shade600)),
+                        ),
+                      );
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 4),
+                      child: TextField(
+                        controller: controllers[p.id],
+                        focusNode: focusNodes[p.id],
+                        decoration: InputDecoration(
+                          labelText: p.name,
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(
+                                signed: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^-?\d*')),
+                        ],
+                        onEditingComplete: autoCalcLast,
+                        onTapOutside: (_) => autoCalcLast(),
+                      ),
+                    );
+                  }),
+                ],
               ),
             ),
             actions: [
@@ -395,29 +518,37 @@ class _ScoreTab extends ConsumerWidget {
                 child: const Text('キャンセル'),
               ),
               TextButton(
-                onPressed: () async {
-                  final gameNumber = games.length + 1;
-                  final gameId =
-                      await db.into(db.games).insert(
-                            GamesCompanion.insert(
-                              gameDayId: gameDayId,
-                              gameNumber: gameNumber,
-                            ),
-                          );
-                  for (final p in players) {
-                    final score = int.tryParse(
-                            controllers[p.id]!.text.trim()) ??
-                        0;
-                    await db.into(db.gameScores).insert(
-                          GameScoresCompanion.insert(
-                            gameId: gameId,
-                            playerId: p.id,
-                            score: score,
-                          ),
-                        );
-                  }
-                  if (context.mounted) Navigator.pop(context);
-                },
+                onPressed: !canSave
+                    ? null
+                    : () async {
+                        final gameId =
+                            await db.into(db.games).insert(
+                                  GamesCompanion.insert(
+                                    gameDayId: gameDayId,
+                                    gameNumber: gameNumber,
+                                  ),
+                                );
+                        for (final p in players) {
+                          if (sittingOutIds.contains(p.id)) {
+                            continue;
+                          }
+                          final score = int.tryParse(
+                                  controllers[p.id]!
+                                      .text
+                                      .trim()) ??
+                              0;
+                          await db.into(db.gameScores).insert(
+                                GameScoresCompanion.insert(
+                                  gameId: gameId,
+                                  playerId: p.id,
+                                  score: score,
+                                ),
+                              );
+                        }
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
                 child: const Text('保存'),
               ),
             ],
@@ -501,7 +632,8 @@ class _ChipTab extends ConsumerWidget {
       innerJoin(db.gameDayPlayers,
           db.gameDayPlayers.playerId.equalsExp(db.players.id)),
     ])
-      ..where(db.gameDayPlayers.gameDayId.equals(gameDayId));
+      ..where(db.gameDayPlayers.gameDayId.equals(gameDayId))
+      ..orderBy([OrderingTerm.asc(db.gameDayPlayers.id)]);
 
     return query.watch().map(
         (rows) => rows.map((r) => r.readTable(db.players)).toList());

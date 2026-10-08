@@ -347,5 +347,80 @@ class AppDatabase extends _$AppDatabase {
           ChipSettlementsCompanion.insert(
               gameDayId: gd3, playerId: e[0], chipDiff: e[1]));
     }
+
+    // --- 対戦日4: 四麻5人ローテ (8/9) ---
+    // 半荘ごとに1人休み。休みは GameScores 行なし。
+    final gd4 = await into(gameDays).insert(
+      GameDaysCompanion.insert(
+        date: DateTime(2026, 8, 9),
+        playerCount: Value(4),
+        scoreRate: Value(50),
+        chipRate: Value(100),
+        memo: const Value('5人打ちローテ'),
+      ),
+    );
+    for (final pid in [p1, p2, p3, p4, p5]) {
+      await into(gameDayPlayers).insert(
+          GameDayPlayersCompanion.insert(
+              gameDayId: gd4, playerId: pid));
+    }
+
+    // 半荘1: p1休み
+    final g11 = await into(games).insert(
+        GamesCompanion.insert(gameDayId: gd4, gameNumber: 1));
+    for (final e in [
+      [p2, 40], [p3, -10], [p4, -5], [p5, -25]
+    ]) {
+      await into(gameScores).insert(GameScoresCompanion.insert(
+          gameId: g11, playerId: e[0], score: e[1]));
+    }
+
+    // 半荘2: p2休み
+    final g12 = await into(games).insert(
+        GamesCompanion.insert(gameDayId: gd4, gameNumber: 2));
+    for (final e in [
+      [p1, -20], [p3, 35], [p4, -15], [p5, 0]
+    ]) {
+      await into(gameScores).insert(GameScoresCompanion.insert(
+          gameId: g12, playerId: e[0], score: e[1]));
+    }
+
+    // 半荘3: p3休み
+    final g13 = await into(games).insert(
+        GamesCompanion.insert(gameDayId: gd4, gameNumber: 3));
+    for (final e in [
+      [p1, 25], [p2, -30], [p4, 10], [p5, -5]
+    ]) {
+      await into(gameScores).insert(GameScoresCompanion.insert(
+          gameId: g13, playerId: e[0], score: e[1]));
+    }
+
+    // 半荘4: p4休み
+    final g14 = await into(games).insert(
+        GamesCompanion.insert(gameDayId: gd4, gameNumber: 4));
+    for (final e in [
+      [p1, -5], [p2, 15], [p3, -20], [p5, 10]
+    ]) {
+      await into(gameScores).insert(GameScoresCompanion.insert(
+          gameId: g14, playerId: e[0], score: e[1]));
+    }
+
+    // 半荘5: p5休み
+    final g15 = await into(games).insert(
+        GamesCompanion.insert(gameDayId: gd4, gameNumber: 5));
+    for (final e in [
+      [p1, 10], [p2, -5], [p3, 20], [p4, -25]
+    ]) {
+      await into(gameScores).insert(GameScoresCompanion.insert(
+          gameId: g15, playerId: e[0], score: e[1]));
+    }
+
+    for (final e in [
+      [p1, 2], [p2, -1], [p3, 3], [p4, -2], [p5, -2]
+    ]) {
+      await into(chipSettlements).insert(
+          ChipSettlementsCompanion.insert(
+              gameDayId: gd4, playerId: e[0], chipDiff: e[1]));
+    }
   }
 }

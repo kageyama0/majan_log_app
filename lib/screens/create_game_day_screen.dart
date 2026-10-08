@@ -16,12 +16,22 @@ class CreateGameDayScreen extends ConsumerStatefulWidget {
 
 class _CreateGameDayScreenState
     extends ConsumerState<CreateGameDayScreen> {
-  int _playerCount = 4;
+  /// 席数（三麻=3 / 四麻=4）。参加者数とは別。
+  int _seatCount = 4;
   final Set<int> _selectedPlayerIds = {};
   DateTime _date = DateTime.now();
   final _scoreRateController = TextEditingController();
   final _chipRateController = TextEditingController();
   bool _loaded = false;
+
+  /// 席数+余剰人数まで選択可（例: 四麻+1=5人、三麻+1=4人）。
+  int get _maxParticipants => _seatCount + 3;
+
+  int get _minParticipants => _seatCount;
+
+  bool get _canCreate =>
+      _selectedPlayerIds.length >= _minParticipants &&
+      _selectedPlayerIds.length <= _maxParticipants;
 
   @override
   void initState() {
@@ -56,6 +66,14 @@ class _CreateGameDayScreenState
       );
     }
 
+    final selected = _selectedPlayerIds.length;
+    final needMore = selected < _minParticipants;
+    final selectionHint = needMore
+        ? 'メンバー選択 ($_minParticipants人以上選んでください・残り${_minParticipants - selected}人)'
+        : selected > _seatCount
+            ? 'メンバー選択 ($selected人 / 席$_seatCount・休み${selected - _seatCount}人ローテ)'
+            : 'メンバー選択 ($selected人 / 席$_seatCount)';
+
     return Scaffold(
       appBar: AppBar(title: const Text('新しい対戦日')),
       body: Padding(
@@ -80,20 +98,34 @@ class _CreateGameDayScreenState
               },
             ),
             const SizedBox(height: 16),
-            const Text('人数',
+            const Text('卓の人数（席数）',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             SegmentedButton<int>(
               segments: const [
                 ButtonSegment(value: 3, label: Text('三麻')),
                 ButtonSegment(value: 4, label: Text('四麻')),
               ],
-              selected: {_playerCount},
+              selected: {_seatCount},
               onSelectionChanged: (value) {
                 setState(() {
-                  _playerCount = value.first;
-                  _selectedPlayerIds.clear();
+                  _seatCount = value.first;
+                  // 席数が減った場合は余剰超過分を落とす
+                  while (_selectedPlayerIds.length >
+                      _maxParticipants) {
+                    _selectedPlayerIds.remove(
+                        _selectedPlayerIds.last);
+                  }
                 });
               },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '参加者は席数より多く選べます（例: 四麻5人・三麻4人）。'
+              '余分な人は半荘ごとに休みローテします。',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade700,
+              ),
             ),
             const SizedBox(height: 16),
             const Text('レート',
@@ -133,7 +165,7 @@ class _CreateGameDayScreenState
               ],
             ),
             const SizedBox(height: 16),
-            Text('メンバー選択 ($_playerCount人選んでください)',
+            Text(selectionHint,
                 style:
                     const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -151,16 +183,16 @@ class _CreateGameDayScreenState
                 return Wrap(
                   spacing: 8,
                   children: players.map((p) {
-                    final selected =
+                    final isSelected =
                         _selectedPlayerIds.contains(p.id);
                     return FilterChip(
                       label: Text(p.name),
-                      selected: selected,
+                      selected: isSelected,
                       onSelected: (value) {
                         setState(() {
                           if (value) {
                             if (_selectedPlayerIds.length <
-                                _playerCount) {
+                                _maxParticipants) {
                               _selectedPlayerIds.add(p.id);
                             }
                           } else {
@@ -176,14 +208,13 @@ class _CreateGameDayScreenState
           ],
         ),
       ),
-      floatingActionButton:
-          _selectedPlayerIds.length == _playerCount
-              ? FloatingActionButton.extended(
-                  onPressed: () => _create(db),
-                  label: const Text('作成'),
-                  icon: const Icon(Icons.check),
-                )
-              : null,
+      floatingActionButton: _canCreate
+          ? FloatingActionButton.extended(
+              onPressed: () => _create(db),
+              label: const Text('作成'),
+              icon: const Icon(Icons.check),
+            )
+          : null,
     );
   }
 
@@ -196,7 +227,7 @@ class _CreateGameDayScreenState
     final gameDayId = await db.into(db.gameDays).insert(
           GameDaysCompanion.insert(
             date: _date,
-            playerCount: Value(_playerCount),
+            playerCount: Value(_seatCount),
             scoreRate: Value(scoreRate),
             chipRate: Value(chipRate),
           ),

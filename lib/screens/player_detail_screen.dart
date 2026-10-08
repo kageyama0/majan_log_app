@@ -444,11 +444,12 @@ class _PlayerDetailScreenState
       final dateStr =
           '${gd.date.year}/${gd.date.month}/${gd.date.day}';
 
+      // 休み半荘は GameScores が無いため、実際に打った半荘数のみ計上
       records.add(_GameDayRecord(
         dateStr: dateStr,
         type: gd.playerCount == 3 ? '三麻' : '四麻',
         playerCount: gd.playerCount,
-        gameCount: games.length,
+        gameCount: scores.length,
         totalScore: dayScore,
         chipNet: chipNet,
       ));

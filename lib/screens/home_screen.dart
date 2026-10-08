@@ -60,27 +60,45 @@ class HomeScreen extends ConsumerWidget {
                   textAlign: TextAlign.center),
             );
           }
-          return ListView.builder(
-            itemCount: gameDays.length,
-            itemBuilder: (context, index) {
-              final gd = gameDays[index];
-              final dateStr =
-                  '${gd.date.year}/${gd.date.month}/${gd.date.day}';
-              final typeStr = gd.playerCount == 3 ? '三麻' : '四麻';
-              final rateStr = '点${gd.scoreRate}円 / チップ${gd.chipRate}円';
-              return ListTile(
-                title: Text('$dateStr ($typeStr)'),
-                subtitle: Text(
-                  [rateStr, if (gd.memo != null) gd.memo!]
-                      .join(' / '),
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          GameDayDetailScreen(gameDayId: gd.id),
+          return StreamBuilder<List<GameDayPlayer>>(
+            stream: db.select(db.gameDayPlayers).watch(),
+            builder: (context, gdpSnap) {
+              final counts = <int, int>{};
+              for (final row in gdpSnap.data ?? const <GameDayPlayer>[]) {
+                counts[row.gameDayId] =
+                    (counts[row.gameDayId] ?? 0) + 1;
+              }
+              return ListView.builder(
+                itemCount: gameDays.length,
+                itemBuilder: (context, index) {
+                  final gd = gameDays[index];
+                  final dateStr =
+                      '${gd.date.year}/${gd.date.month}/${gd.date.day}';
+                  final typeStr =
+                      gd.playerCount == 3 ? '三麻' : '四麻';
+                  final n = counts[gd.id];
+                  final peopleSuffix =
+                      (n != null && n > gd.playerCount)
+                          ? '・$n人'
+                          : '';
+                  final rateStr =
+                      '点${gd.scoreRate}円 / チップ${gd.chipRate}円';
+                  return ListTile(
+                    title:
+                        Text('$dateStr ($typeStr$peopleSuffix)'),
+                    subtitle: Text(
+                      [rateStr, if (gd.memo != null) gd.memo!]
+                          .join(' / '),
                     ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GameDayDetailScreen(
+                              gameDayId: gd.id),
+                        ),
+                      );
+                    },
                   );
                 },
               );
