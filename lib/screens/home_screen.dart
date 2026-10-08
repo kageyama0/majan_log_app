@@ -90,7 +90,12 @@ class HomeScreen extends ConsumerWidget {
                       [rateStr, if (gd.memo != null) gd.memo!]
                           .join(' / '),
                     ),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: '対戦日を削除',
+                      onPressed: () =>
+                          _confirmDeleteGameDay(context, db, gd),
+                    ),
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -115,6 +120,39 @@ class HomeScreen extends ConsumerWidget {
           );
         },
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _confirmDeleteGameDay(
+      BuildContext context, AppDatabase db, GameDay gd) {
+    final dateStr =
+        '${gd.date.year}/${gd.date.month}/${gd.date.day}';
+    final typeStr = gd.playerCount == 3 ? '三麻' : '四麻';
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('対戦日を削除'),
+        content: Text(
+          '$dateStr ($typeStr) を削除しますか？\n'
+          '半荘・スコア・チップ記録もすべて削除されます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await db.deleteGameDayCascade(gd.id);
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+            },
+            child: const Text('削除',
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

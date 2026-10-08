@@ -94,6 +94,9 @@ class ChipSettlements extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// テスト用（インメモリ等の [QueryExecutor] を直接渡す）。
+  AppDatabase.forTesting(super.e);
+
   @override
   int get schemaVersion => 3;
 
@@ -122,6 +125,38 @@ class AppDatabase extends _$AppDatabase {
     await into(appSettings).insertOnConflictUpdate(
       AppSettingsCompanion.insert(key: key, value: value),
     );
+  }
+
+  /// 対戦日とその関連データ（半荘・スコア・参加者・チップ）を削除する。
+  /// FK に ON DELETE CASCADE が無いため、依存順に明示削除する。
+  Future<void> deleteGameDayCascade(int gameDayId) async {
+    await transaction(() async {
+      final dayGames = await (select(games)
+            ..where((t) => t.gameDayId.equals(gameDayId)))
+          .get();
+      final gameIds = dayGames.map((g) => g.id).toList();
+
+      if (gameIds.isNotEmpty) {
+        await (delete(gameScores)
+              ..where((t) => t.gameId.isIn(gameIds)))
+            .go();
+        await (delete(games)
+              ..where((t) => t.id.isIn(gameIds)))
+            .go();
+      }
+
+      await (delete(chipSettlements)
+            ..where((t) => t.gameDayId.equals(gameDayId)))
+          .go();
+      await (delete(chipLoans)
+            ..where((t) => t.gameDayId.equals(gameDayId)))
+          .go();
+      await (delete(gameDayPlayers)
+            ..where((t) => t.gameDayId.equals(gameDayId)))
+          .go();
+      await (delete(gameDays)..where((t) => t.id.equals(gameDayId)))
+          .go();
+    });
   }
 
   static LazyDatabase _openConnection() {

@@ -34,6 +34,38 @@ class _GameDayDetailScreenState
     super.dispose();
   }
 
+  void _confirmDelete(AppDatabase db) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('対戦日を削除'),
+        content: const Text(
+          'この対戦日を削除しますか？\n'
+          '半荘・スコア・チップ記録もすべて削除されます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await db.deleteGameDayCascade(widget.gameDayId);
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+              if (mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('削除',
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(databaseProvider);
@@ -64,6 +96,13 @@ class _GameDayDetailScreenState
             );
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: '対戦日を削除',
+            onPressed: () => _confirmDelete(db),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
