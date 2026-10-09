@@ -5,7 +5,7 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/screens/chip_settlement_screen.dart';
-import 'package:majan_log_app/utils/sit_out_rotation.dart';
+import 'package:majan_log_app/widgets/hanchan_score_form.dart';
 
 class GameDayDetailScreen extends ConsumerStatefulWidget {
   final int gameDayId;
@@ -142,12 +142,37 @@ class _GameDayDetailScreenState
   }
 }
 
-class _ScoreTab extends ConsumerWidget {
+/// インライン編集の対象（追加 or 既存半荘）。
+class _InlineHanchanEditor {
+  final Game? game; // null = 新規追加
+  final int gameNumber;
+  final Map<int, int> initialScores;
+  final Set<int>? initialSittingOutIds;
+
+  const _InlineHanchanEditor({
+    required this.gameNumber,
+    this.game,
+    this.initialScores = const {},
+    this.initialSittingOutIds,
+  });
+}
+
+class _ScoreTab extends ConsumerStatefulWidget {
   final int gameDayId;
   const _ScoreTab({required this.gameDayId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ScoreTab> createState() => _ScoreTabState();
+}
+
+class _ScoreTabState extends ConsumerState<_ScoreTab> {
+  _InlineHanchanEditor? _inlineEditor;
+  final _inlineFormKey = GlobalKey();
+
+  int get gameDayId => widget.gameDayId;
+
+  @override
+  Widget build(BuildContext context) {
     final db = ref.watch(databaseProvider);
 
     return StreamBuilder<GameDay>(
@@ -217,8 +242,12 @@ class _ScoreTab extends ConsumerWidget {
         (rows) => rows.map((r) => r.readTable(db.players)).toList());
   }
 
-  Widget _buildScoreTable(BuildContext context, AppDatabase db,
-      GameDay gameDay, List<Player> players, List<Game> games,
+  Widget _buildScoreTable(
+      BuildContext context,
+      AppDatabase db,
+      GameDay gameDay,
+      List<Player> players,
+      List<Game> games,
       List<GameScore> allScores) {
     final seatCount = gameDay.playerCount;
     final hasSitOut = players.length > seatCount;
@@ -244,18 +273,16 @@ class _ScoreTab extends ConsumerWidget {
 
     Widget cell(String text,
         {bool bold = false, Color? color, Color? bg}) {
-      return GestureDetector(
-        child: Container(
-          color: bg,
-          padding: const EdgeInsets.symmetric(
-              vertical: 10, horizontal: 8),
-          alignment: Alignment.center,
-          child: Text(
-            text,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : null,
-              color: color,
-            ),
+      return Container(
+        color: bg,
+        padding: const EdgeInsets.symmetric(
+            vertical: 10, horizontal: 8),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontWeight: bold ? FontWeight.bold : null,
+            color: color,
           ),
         ),
       );
@@ -270,7 +297,19 @@ class _ScoreTab extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 '参加者${players.length}人 / 席$seatCount人'
-                '（休みは半荘ごとにローテ・「休」表示）',
+                '（休みは半荘ごとにローテ・「休」表示）\n'
+                '行をタップで編集 / 長押しで削除',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '行をタップで編集 / 長押しで削除',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade700,
@@ -291,9 +330,22 @@ class _ScoreTab extends ConsumerWidget {
                 ],
               ),
               ...games.map((game) {
+                final editingThis = _inlineEditor?.game?.id == game.id;
                 return TableRow(
+                  decoration: editingThis
+                      ? BoxDecoration(color: Colors.blue.shade50)
+                      : null,
                   children: [
                     GestureDetector(
+                      onTap: () => _openEdit(
+                        context,
+                        db,
+                        gameDay,
+                        players,
+                        scores,
+                        game,
+                        useModal: hasSitOut,
+                      ),
                       onLongPress: () =>
                           _showDeleteGameDialog(context, db, game),
                       child: cell('${game.gameNumber}'),
@@ -307,9 +359,17 @@ class _ScoreTab extends ConsumerWidget {
                       final sittingOut =
                           hasSitOut && score == null;
                       return GestureDetector(
-                        onLongPress: () =>
-                            _showDeleteGameDialog(
-                                context, db, game),
+                        onTap: () => _openEdit(
+                          context,
+                          db,
+                          gameDay,
+                          players,
+                          scores,
+                          game,
+                          useModal: hasSitOut,
+                        ),
+                        onLongPress: () => _showDeleteGameDialog(
+                            context, db, game),
                         child: sittingOut
                             ? cell('休',
                                 color: Colors.grey.shade600,
@@ -372,12 +432,53 @@ class _ScoreTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () => _showAddScoreDialog(
-                context, db, gameDay, players, games),
-            icon: const Icon(Icons.add),
-            label: const Text('半荘を追加'),
-          ),
+          if (_inlineEditor != null) ...[
+            KeyedSubtree(
+              key: _inlineFormKey,
+              child: HanchanScoreForm(
+                key: ValueKey(
+                  'inline-${_inlineEditor!.game?.id ?? 'new'}-'
+                  '${_inlineEditor!.gameNumber}',
+                ),
+                gameNumber: _inlineEditor!.gameNumber,
+                seatCount: seatCount,
+                players: players,
+                initialScores: _inlineEditor!.initialScores,
+                initialSittingOutIds:
+                    _inlineEditor!.initialSittingOutIds,
+                inline: true,
+                onCancel: () =>
+                    setState(() => _inlineEditor = null),
+                onSave: ({
+                  required sittingOutIds,
+                  required scores,
+                }) async {
+                  await _persistHanchan(
+                    db: db,
+                    existing: _inlineEditor!.game,
+                    gameNumber: _inlineEditor!.gameNumber,
+                    scores: scores,
+                  );
+                  if (mounted) {
+                    setState(() => _inlineEditor = null);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ] else
+            ElevatedButton.icon(
+              onPressed: () => _openAdd(
+                context,
+                db,
+                gameDay,
+                players,
+                games,
+                useModal: hasSitOut,
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('半荘を追加'),
+            ),
         ],
       ),
     );
@@ -394,204 +495,177 @@ class _ScoreTab extends ConsumerWidget {
     return '$abs';
   }
 
-  void _showAddScoreDialog(
-      BuildContext context,
-      AppDatabase db,
-      GameDay gameDay,
-      List<Player> players,
-      List<Game> games) {
-    final seatCount = gameDay.playerCount;
+  Map<int, int> _scoresForGame(List<GameScore> scores, int gameId) {
+    return {
+      for (final s in scores.where((s) => s.gameId == gameId))
+        s.playerId: s.score,
+    };
+  }
+
+  Set<int> _sittingOutForGame(
+    List<Player> players,
+    List<GameScore> scores,
+    int gameId,
+  ) {
+    final scored = scores
+        .where((s) => s.gameId == gameId)
+        .map((s) => s.playerId)
+        .toSet();
+    return players
+        .where((p) => !scored.contains(p.id))
+        .map((p) => p.id)
+        .toSet();
+  }
+
+  Future<void> _persistHanchan({
+    required AppDatabase db,
+    required Game? existing,
+    required int gameNumber,
+    required Map<int, int> scores,
+  }) async {
+    await db.transaction(() async {
+      late final int gameId;
+      if (existing == null) {
+        gameId = await db.into(db.games).insert(
+              GamesCompanion.insert(
+                gameDayId: gameDayId,
+                gameNumber: gameNumber,
+              ),
+            );
+      } else {
+        gameId = existing.id;
+        await (db.delete(db.gameScores)
+              ..where((t) => t.gameId.equals(gameId)))
+            .go();
+      }
+      for (final entry in scores.entries) {
+        await db.into(db.gameScores).insert(
+              GameScoresCompanion.insert(
+                gameId: gameId,
+                playerId: entry.key,
+                score: entry.value,
+              ),
+            );
+      }
+    });
+  }
+
+  void _openAdd(
+    BuildContext context,
+    AppDatabase db,
+    GameDay gameDay,
+    List<Player> players,
+    List<Game> games, {
+    required bool useModal,
+  }) {
     final gameNumber = games.length + 1;
-    final participantIds = players.map((p) => p.id).toList();
-    final defaultSitOut = defaultSittingOutPlayerIds(
-      participantIds: participantIds,
-      seatCount: seatCount,
-      gameNumber: gameNumber,
-    );
-    final sittingOutIds = Set<int>.from(defaultSitOut);
-
-    final controllers = <int, TextEditingController>{};
-    final focusNodes = <int, FocusNode>{};
-    for (final p in players) {
-      controllers[p.id] = TextEditingController();
-      focusNodes[p.id] = FocusNode();
+    if (useModal) {
+      _showHanchanDialog(
+        context: context,
+        db: db,
+        gameDay: gameDay,
+        players: players,
+        gameNumber: gameNumber,
+        existing: null,
+        initialScores: const {},
+        initialSittingOutIds: null,
+      );
+      return;
     }
+    setState(() {
+      _inlineEditor = _InlineHanchanEditor(gameNumber: gameNumber);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _inlineFormKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
-    showDialog(
+  void _openEdit(
+    BuildContext context,
+    AppDatabase db,
+    GameDay gameDay,
+    List<Player> players,
+    List<GameScore> scores,
+    Game game, {
+    required bool useModal,
+  }) {
+    final initialScores = _scoresForGame(scores, game.id);
+    final initialSitOut = players.length > gameDay.playerCount
+        ? _sittingOutForGame(players, scores, game.id)
+        : <int>{};
+
+    if (useModal) {
+      _showHanchanDialog(
+        context: context,
+        db: db,
+        gameDay: gameDay,
+        players: players,
+        gameNumber: game.gameNumber,
+        existing: game,
+        initialScores: initialScores,
+        initialSittingOutIds: initialSitOut,
+      );
+      return;
+    }
+    setState(() {
+      _inlineEditor = _InlineHanchanEditor(
+        game: game,
+        gameNumber: game.gameNumber,
+        initialScores: initialScores,
+        initialSittingOutIds: initialSitOut,
+      );
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _inlineFormKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _showHanchanDialog({
+    required BuildContext context,
+    required AppDatabase db,
+    required GameDay gameDay,
+    required List<Player> players,
+    required int gameNumber,
+    required Game? existing,
+    required Map<int, int> initialScores,
+    required Set<int>? initialSittingOutIds,
+  }) {
+    showDialog<void>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final seated = seatedPlayerIds(
-            participantIds: participantIds,
-            sittingOutIds: sittingOutIds,
+      builder: (dialogContext) => HanchanScoreForm(
+        gameNumber: gameNumber,
+        seatCount: gameDay.playerCount,
+        players: players,
+        initialScores: initialScores,
+        initialSittingOutIds: initialSittingOutIds,
+        onCancel: () => Navigator.pop(dialogContext),
+        onSave: ({
+          required sittingOutIds,
+          required scores,
+        }) async {
+          await _persistHanchan(
+            db: db,
+            existing: existing,
+            gameNumber: gameNumber,
+            scores: scores,
           );
-          final excess = players.length - seatCount;
-          final canSave = seated.length == seatCount;
-
-          void autoCalcLast() {
-            final filled = <int, int>{};
-            int? emptyPlayerId;
-            int emptyCount = 0;
-            for (final id in seated) {
-              final text = controllers[id]!.text.trim();
-              if (text.isEmpty) {
-                emptyPlayerId = id;
-                emptyCount++;
-              } else {
-                filled[id] = int.tryParse(text) ?? 0;
-              }
-            }
-            if (emptyCount == 1 &&
-                filled.length == seated.length - 1 &&
-                emptyPlayerId != null) {
-              final sum =
-                  filled.values.fold<int>(0, (a, b) => a + b);
-              controllers[emptyPlayerId]!.text = '${-sum}';
-            }
+          if (dialogContext.mounted) {
+            Navigator.pop(dialogContext);
           }
-
-          return AlertDialog(
-            title: Text('半荘 $gameNumber'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (excess > 0) ...[
-                    const Text('休み（タップで変更）',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      children: players.map((p) {
-                        final resting =
-                            sittingOutIds.contains(p.id);
-                        return FilterChip(
-                          label: Text(p.name),
-                          selected: resting,
-                          onSelected: (value) {
-                            setDialogState(() {
-                              if (value) {
-                                if (sittingOutIds.length <
-                                    excess) {
-                                  sittingOutIds.add(p.id);
-                                  controllers[p.id]!.clear();
-                                } else if (sittingOutIds
-                                        .length ==
-                                    excess) {
-                                  // 枠がいっぱいなら入れ替え: 先に入っていた1人を外す
-                                  sittingOutIds
-                                      .remove(sittingOutIds.first);
-                                  sittingOutIds.add(p.id);
-                                  controllers[p.id]!.clear();
-                                }
-                              } else {
-                                sittingOutIds.remove(p.id);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    if (!canSave)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          '休みはちょうど $excess 人選んでください'
-                          '（卓は $seatCount 人）',
-                          style: const TextStyle(
-                              color: Colors.red, fontSize: 12),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                  ],
-                  ...players.map((p) {
-                    final resting =
-                        sittingOutIds.contains(p.id);
-                    if (resting) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 4),
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: '${p.name}（休み）',
-                            border: const OutlineInputBorder(),
-                            filled: true,
-                            fillColor: Colors.grey.shade100,
-                          ),
-                          child: Text('休',
-                              style: TextStyle(
-                                  color: Colors.grey.shade600)),
-                        ),
-                      );
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 4),
-                      child: TextField(
-                        controller: controllers[p.id],
-                        focusNode: focusNodes[p.id],
-                        decoration: InputDecoration(
-                          labelText: p.name,
-                          border: const OutlineInputBorder(),
-                        ),
-                        keyboardType:
-                            const TextInputType.numberWithOptions(
-                                signed: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^-?\d*')),
-                        ],
-                        onEditingComplete: autoCalcLast,
-                        onTapOutside: (_) => autoCalcLast(),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('キャンセル'),
-              ),
-              TextButton(
-                onPressed: !canSave
-                    ? null
-                    : () async {
-                        final gameId =
-                            await db.into(db.games).insert(
-                                  GamesCompanion.insert(
-                                    gameDayId: gameDayId,
-                                    gameNumber: gameNumber,
-                                  ),
-                                );
-                        for (final p in players) {
-                          if (sittingOutIds.contains(p.id)) {
-                            continue;
-                          }
-                          final score = int.tryParse(
-                                  controllers[p.id]!
-                                      .text
-                                      .trim()) ??
-                              0;
-                          await db.into(db.gameScores).insert(
-                                GameScoresCompanion.insert(
-                                  gameId: gameId,
-                                  playerId: p.id,
-                                  score: score,
-                                ),
-                              );
-                        }
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                child: const Text('保存'),
-              ),
-            ],
-          );
         },
       ),
     );
@@ -617,6 +691,13 @@ class _ScoreTab extends ConsumerWidget {
               await (db.delete(db.games)
                     ..where((t) => t.id.equals(game.id)))
                   .go();
+              if (mounted) {
+                setState(() {
+                  if (_inlineEditor?.game?.id == game.id) {
+                    _inlineEditor = null;
+                  }
+                });
+              }
               if (context.mounted) Navigator.pop(context);
             },
             child: const Text('削除',
