@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:majan_log_app/utils/score_balance.dart';
+import 'package:majan_log_app/utils/sit_out_rotation.dart';
 
-/// 1半荘分のセル直打ち状態（余剰なしスプレッドシート用）。
+/// 1半荘分のセル直打ち状態（休みあり／なし共用）。
 class HanchanRowEditor {
   final int? gameId; // null = 未保存の新規行
   final int gameNumber;
   final List<int> playerIds;
+  final int seatCount;
   final Map<int, TextEditingController> controllers;
   final Map<int, FocusNode> focusNodes;
+  Set<int> sittingOutIds;
   int? autoFilledPlayerId;
   bool saving = false;
+
+  /// ローカル編集中（ストリーム同期で上書きしない）
+  bool dirty = false;
 
   /// 最後に DB へ書いたスコア（変更検知用）
   Map<int, int>? lastPersisted;
@@ -18,8 +24,10 @@ class HanchanRowEditor {
   HanchanRowEditor({
     required this.gameNumber,
     required this.playerIds,
+    required this.seatCount,
     this.gameId,
     Map<int, int>? initialScores,
+    Set<int>? initialSittingOutIds,
   })  : controllers = {
           for (final id in playerIds)
             id: TextEditingController(
@@ -31,21 +39,101 @@ class HanchanRowEditor {
         focusNodes = {
           for (final id in playerIds) id: FocusNode(),
         },
+        sittingOutIds = _resolveInitialSitOut(
+          playerIds: playerIds,
+          seatCount: seatCount,
+          gameNumber: gameNumber,
+          initialScores: initialScores,
+          initialSittingOutIds: initialSittingOutIds,
+        ),
         lastPersisted =
-            initialScores == null ? null : Map<int, int>.from(initialScores);
+            initialScores == null ? null : Map<int, int>.from(initialScores) {
+    for (final id in sittingOutIds) {
+      controllers[id]?.clear();
+    }
+  }
+
+  static Set<int> _resolveInitialSitOut({
+    required List<int> playerIds,
+    required int seatCount,
+    required int gameNumber,
+    Map<int, int>? initialScores,
+    Set<int>? initialSittingOutIds,
+  }) {
+    final excess = playerIds.length - seatCount;
+    if (excess <= 0) return {};
+    if (initialSittingOutIds != null) {
+      return Set<int>.from(initialSittingOutIds);
+    }
+    if (initialScores != null) {
+      return playerIds.where((id) => !initialScores.containsKey(id)).toSet();
+    }
+    return defaultSittingOutPlayerIds(
+      participantIds: playerIds,
+      seatCount: seatCount,
+      gameNumber: gameNumber,
+    ).toSet();
+  }
+
+  int get excess => playerIds.length - seatCount;
+
+  bool get hasSitOut => excess > 0;
+
+  List<int> get seatedIds => seatedPlayerIds(
+        participantIds: playerIds,
+        sittingOutIds: sittingOutIds,
+      );
+
+  bool get sitOutCountOk =>
+      !hasSitOut || sittingOutIds.length == excess;
 
   bool get anyFocused => focusNodes.values.any((n) => n.hasFocus);
 
+  bool isSittingOut(int playerId) => sittingOutIds.contains(playerId);
+
   void syncFromScores(Map<int, int> scores) {
-    if (anyFocused || saving) return;
+    if (anyFocused || saving || dirty) return;
+    if (hasSitOut) {
+      sittingOutIds =
+          playerIds.where((id) => !scores.containsKey(id)).toSet();
+    } else {
+      sittingOutIds = {};
+    }
     for (final id in playerIds) {
-      final next = scores.containsKey(id) ? '${scores[id]}' : '';
-      if (controllers[id]!.text != next) {
-        controllers[id]!.text = next;
+      if (sittingOutIds.contains(id)) {
+        if (controllers[id]!.text.isNotEmpty) {
+          controllers[id]!.clear();
+        }
+      } else {
+        final next = scores.containsKey(id) ? '${scores[id]}' : '';
+        if (controllers[id]!.text != next) {
+          controllers[id]!.text = next;
+        }
       }
     }
     lastPersisted = Map<int, int>.from(scores);
     autoFilledPlayerId = null;
+  }
+
+  /// 休みトグル。枠が満杯なら入れ替え。
+  void toggleSitOut(int playerId) {
+    if (!hasSitOut || !playerIds.contains(playerId)) return;
+    dirty = true;
+    autoFilledPlayerId = null;
+    if (sittingOutIds.contains(playerId)) {
+      sittingOutIds.remove(playerId);
+      return;
+    }
+    if (sittingOutIds.length < excess) {
+      sittingOutIds.add(playerId);
+      controllers[playerId]!.clear();
+      return;
+    }
+    // 枠いっぱい: 先頭と入れ替え
+    final removed = sittingOutIds.first;
+    sittingOutIds.remove(removed);
+    sittingOutIds.add(playerId);
+    controllers[playerId]!.clear();
   }
 
   void dispose() {
@@ -57,10 +145,13 @@ class HanchanRowEditor {
     }
   }
 
-  /// 入力中プレイヤー以外でゼロ和自動記入を試す。
+  /// 席上メンバーだけでゼロ和自動記入を試す。
   void autoCalcLast({int? skipPlayerId}) {
+    final seated = seatedIds;
+    if (seated.isEmpty) return;
+
     final texts = <int, String>{
-      for (final id in playerIds) id: controllers[id]!.text,
+      for (final id in seated) id: controllers[id]!.text,
     };
 
     final autoId = autoFilledPlayerId;
@@ -73,10 +164,10 @@ class HanchanRowEditor {
     }
 
     if (autoId != null &&
-        playerIds.contains(autoId) &&
+        seated.contains(autoId) &&
         autoId != skipPlayerId &&
         autoId != focusedId) {
-      final othersFilled = playerIds
+      final othersFilled = seated
           .where((id) => id != autoId)
           .every((id) => texts[id]!.trim().isNotEmpty);
       if (othersFilled) {
@@ -97,12 +188,14 @@ class HanchanRowEditor {
       controller.selection = TextSelection.collapsed(offset: next.length);
     }
     autoFilledPlayerId = result.playerId;
+    dirty = true;
   }
 
-  /// 全員分パースできればスコア Map、否则 null。
+  /// 席上メンバー全員分パースでき、休み人数も正しければスコア Map。
   Map<int, int>? parsedScoresOrNull() {
+    if (!sitOutCountOk) return null;
     final result = <int, int>{};
-    for (final id in playerIds) {
+    for (final id in seatedIds) {
       final text = controllers[id]!.text.trim();
       if (text.isEmpty) return null;
       final v = int.tryParse(text);
@@ -118,7 +211,37 @@ class HanchanRowEditor {
     for (final e in scores.entries) {
       if (prev[e.key] != e.value) return false;
     }
+    // 休みメンバー集合も一致しているか
+    if (hasSitOut) {
+      final prevSit =
+          playerIds.where((id) => !prev.containsKey(id)).toSet();
+      if (prevSit.length != sittingOutIds.length ||
+          !prevSit.containsAll(sittingOutIds)) {
+        return false;
+      }
+    }
     return true;
+  }
+
+  /// 席上の次のプレイヤーへフォーカス。いなければ unfocus。
+  void focusNextSeated(int currentPlayerId) {
+    final seated = seatedIds;
+    final idx = seated.indexOf(currentPlayerId);
+    if (idx >= 0 && idx < seated.length - 1) {
+      focusNodes[seated[idx + 1]]!.requestFocus();
+    } else {
+      focusNodes[currentPlayerId]?.unfocus();
+    }
+  }
+
+  int? get firstSeatedId {
+    final seated = seatedIds;
+    return seated.isEmpty ? null : seated.first;
+  }
+
+  bool isLastSeated(int playerId) {
+    final seated = seatedIds;
+    return seated.isNotEmpty && seated.last == playerId;
   }
 }
 
@@ -182,6 +305,39 @@ class ScoreSpreadsheetCell extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// 休みセル。「休」表示。タップで休み解除（トグル）。
+class SitOutSpreadsheetCell extends StatelessWidget {
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const SitOutSpreadsheetCell({
+    super.key,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        color: Colors.grey.shade100,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        alignment: Alignment.center,
+        child: Text(
+          '休',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }

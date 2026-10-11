@@ -5,8 +5,8 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/screens/chip_settlement_screen.dart';
+import 'package:majan_log_app/utils/sit_out_rotation.dart';
 import 'package:majan_log_app/widgets/hanchan_row_editor.dart';
-import 'package:majan_log_app/widgets/hanchan_score_form.dart';
 
 class GameDayDetailScreen extends ConsumerStatefulWidget {
   final int gameDayId;
@@ -143,6 +143,7 @@ class _GameDayDetailScreenState
   }
 }
 
+
 class _ScoreTab extends ConsumerStatefulWidget {
   final int gameDayId;
   const _ScoreTab({required this.gameDayId});
@@ -152,10 +153,10 @@ class _ScoreTab extends ConsumerStatefulWidget {
 }
 
 class _ScoreTabState extends ConsumerState<_ScoreTab> {
-  /// 余剰なし: 既存半荘のセル直打ち状態
+  /// 既存半荘のセル直打ち状態
   final Map<int, HanchanRowEditor> _rowEditors = {};
 
-  /// 余剰なし: 未保存の新規半荘行
+  /// 未保存の新規半荘行
   HanchanRowEditor? _draftRow;
 
   int get gameDayId => widget.gameDayId;
@@ -187,23 +188,18 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
           stream: _watchPlayers(db),
           builder: (context, playersSnapshot) {
             if (!playersSnapshot.hasData) {
-              return const Center(
-                  child: CircularProgressIndicator());
+              return const Center(child: CircularProgressIndicator());
             }
             final players = playersSnapshot.data!;
 
             return StreamBuilder<List<Game>>(
               stream: (db.select(db.games)
-                    ..where(
-                        (t) => t.gameDayId.equals(gameDayId))
-                    ..orderBy([
-                      (t) => OrderingTerm.asc(t.gameNumber)
-                    ]))
+                    ..where((t) => t.gameDayId.equals(gameDayId))
+                    ..orderBy([(t) => OrderingTerm.asc(t.gameNumber)]))
                   .watch(),
               builder: (context, gamesSnapshot) {
                 if (!gamesSnapshot.hasData) {
-                  return const Center(
-                      child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
                 final games = gamesSnapshot.data!;
 
@@ -211,13 +207,11 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
                   stream: db.select(db.gameScores).watch(),
                   builder: (context, scoresSnapshot) {
                     if (!scoresSnapshot.hasData) {
-                      return const Center(
-                          child: CircularProgressIndicator());
+                      return const Center(child: CircularProgressIndicator());
                     }
                     final allScores = scoresSnapshot.data!;
-
-                    return _buildScoreTable(context, db,
-                        gameDay, players, games, allScores);
+                    return _buildScoreTable(
+                        context, db, gameDay, players, games, allScores);
                   },
                 );
               },
@@ -244,6 +238,7 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
     List<Player> players,
     List<Game> games,
     List<GameScore> scores,
+    int seatCount,
   ) {
     final playerIds = players.map((p) => p.id).toList();
     final liveIds = games.map((g) => g.id).toSet();
@@ -262,20 +257,31 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
           gameId: game.id,
           gameNumber: game.gameNumber,
           playerIds: playerIds,
+          seatCount: seatCount,
           initialScores: gameScores,
+          initialSittingOutIds: players.length > seatCount
+              ? _sittingOutForGame(players, scores, game.id)
+              : const {},
         );
       } else {
         existing.syncFromScores(gameScores);
       }
     }
 
-    // 参加者構成が変わったときだけドラフトを作り直す（フォーカス維持のため毎ビルドはしない）
     if (_draftRow != null &&
-        !_listEquals(_draftRow!.playerIds, playerIds)) {
+        (!_listEquals(_draftRow!.playerIds, playerIds) ||
+            _draftRow!.seatCount != seatCount)) {
+      final prevNumber = _draftRow!.gameNumber;
       _draftRow!.dispose();
       _draftRow = HanchanRowEditor(
-        gameNumber: games.length + 1,
+        gameNumber: prevNumber,
         playerIds: playerIds,
+        seatCount: seatCount,
+        initialSittingOutIds: defaultSittingOutPlayerIds(
+          participantIds: playerIds,
+          seatCount: seatCount,
+          gameNumber: prevNumber,
+        ).toSet(),
       );
     }
   }
@@ -289,21 +295,20 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
   }
 
   Widget _buildScoreTable(
-      BuildContext context,
-      AppDatabase db,
-      GameDay gameDay,
-      List<Player> players,
-      List<Game> games,
-      List<GameScore> allScores) {
+    BuildContext context,
+    AppDatabase db,
+    GameDay gameDay,
+    List<Player> players,
+    List<Game> games,
+    List<GameScore> allScores,
+  ) {
     final seatCount = gameDay.playerCount;
     final hasSitOut = players.length > seatCount;
     final gameIds = games.map((g) => g.id).toSet();
     final scores =
         allScores.where((s) => gameIds.contains(s.gameId)).toList();
 
-    if (!hasSitOut) {
-      _syncSpreadsheetEditors(players, games, scores);
-    }
+    _syncSpreadsheetEditors(players, games, scores, seatCount);
 
     final totals = <int, int>{};
     for (final p in players) {
@@ -313,11 +318,10 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
       totals[s.playerId] = (totals[s.playerId] ?? 0) + s.score;
     }
 
-    final colCount = players.length + 1;
     final colWidths = <int, TableColumnWidth>{
       0: const FixedColumnWidth(40),
     };
-    for (int i = 1; i < colCount; i++) {
+    for (int i = 1; i <= players.length; i++) {
       colWidths[i] = const FlexColumnWidth(1);
     }
 
@@ -325,8 +329,7 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
         {bool bold = false, Color? color, Color? bg}) {
       return Container(
         color: bg,
-        padding: const EdgeInsets.symmetric(
-            vertical: 10, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         alignment: Alignment.center,
         child: Text(
           text,
@@ -339,9 +342,8 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
     }
 
     final hint = hasSitOut
-        ? '参加者${players.length}人 / 席$seatCount人'
-            '（休みは半荘ごとにローテ・「休」表示）\n'
-            '行をタップで編集 / 長押しで削除'
+        ? '参加者${players.length}人 / 席$seatCount人\n'
+            'セル直接入力・「休」タップで交代 / 席セル長押しで休み / #長押しで削除'
         : 'セルをタップして直接入力（次へで隣へ） / 長押しで削除';
 
     return Padding(
@@ -352,10 +354,7 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               hint,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
             ),
           ),
           Table(
@@ -363,176 +362,36 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             columnWidths: colWidths,
             children: [
               TableRow(
-                decoration:
-                    BoxDecoration(color: Colors.grey.shade200),
+                decoration: BoxDecoration(color: Colors.grey.shade200),
                 children: [
                   cell('#', bold: true),
-                  ...players
-                      .map((p) => cell(p.name, bold: true)),
+                  ...players.map((p) => cell(p.name, bold: true)),
                 ],
               ),
               ...games.map((game) {
-                if (!hasSitOut) {
-                  final editor = _rowEditors[game.id]!;
-                  return TableRow(
-                    children: [
-                      GestureDetector(
-                        onLongPress: () =>
-                            _showDeleteGameDialog(context, db, game),
-                        child: cell('${game.gameNumber}'),
-                      ),
-                      ...players.asMap().entries.map((entry) {
-                        final i = entry.key;
-                        final p = entry.value;
-                        return ScoreSpreadsheetCell(
-                          controller: editor.controllers[p.id]!,
-                          focusNode: editor.focusNodes[p.id]!,
-                          isLastInRow: i == players.length - 1,
-                          onLongPress: () =>
-                              _showDeleteGameDialog(context, db, game),
-                          onChanged: (_) {
-                            if (editor.autoFilledPlayerId == p.id) {
-                              editor.autoFilledPlayerId = null;
-                            }
-                            editor.autoCalcLast(skipPlayerId: p.id);
-                            // ゼロ和で最終セルが埋まったら保存
-                            if (editor.parsedScoresOrNull() != null &&
-                                editor.autoFilledPlayerId != null) {
-                              _maybePersistSpreadsheetRow(
-                                db: db,
-                                editor: editor,
-                                existing: game,
-                              );
-                            }
-                          },
-                          onEditingComplete: () {
-                            editor.autoCalcLast();
-                            final idx = players
-                                .indexWhere((x) => x.id == p.id);
-                            if (idx >= 0 && idx < players.length - 1) {
-                              editor.focusNodes[players[idx + 1].id]!
-                                  .requestFocus();
-                            } else {
-                              editor.focusNodes[p.id]!.unfocus();
-                            }
-                            _maybePersistSpreadsheetRow(
-                              db: db,
-                              editor: editor,
-                              existing: game,
-                            );
-                          },
-                        );
-                      }),
-                    ],
-                  );
-                }
-
-                return TableRow(
-                  children: [
-                    GestureDetector(
-                      onTap: () => _openEditModal(
-                        context,
-                        db,
-                        gameDay,
-                        players,
-                        scores,
-                        game,
-                      ),
-                      onLongPress: () =>
-                          _showDeleteGameDialog(context, db, game),
-                      child: cell('${game.gameNumber}'),
-                    ),
-                    ...players.map((p) {
-                      final score = scores
-                          .where((s) =>
-                              s.gameId == game.id &&
-                              s.playerId == p.id)
-                          .firstOrNull;
-                      if (score == null) {
-                        return GestureDetector(
-                          onTap: () => _openEditModal(
-                            context,
-                            db,
-                            gameDay,
-                            players,
-                            scores,
-                            game,
-                          ),
-                          onLongPress: () => _showDeleteGameDialog(
-                              context, db, game),
-                          child: cell('休',
-                              color: Colors.grey.shade600,
-                              bg: Colors.grey.shade100),
-                        );
-                      }
-                      final value = score.score;
-                      return GestureDetector(
-                        onTap: () => _openEditModal(
-                          context,
-                          db,
-                          gameDay,
-                          players,
-                          scores,
-                          game,
-                        ),
-                        onLongPress: () => _showDeleteGameDialog(
-                            context, db, game),
-                        child: cell(
-                          value >= 0 ? '+$value' : '$value',
-                          color: value >= 0 ? Colors.black : Colors.red,
-                        ),
-                      );
-                    }),
-                  ],
+                final editor = _rowEditors[game.id]!;
+                return _spreadsheetTableRow(
+                  db: db,
+                  players: players,
+                  editor: editor,
+                  existing: game,
+                  gameNumberLabel: '${game.gameNumber}',
+                  decoration: null,
+                  onDelete: () =>
+                      _showDeleteGameDialog(context, db, game),
+                  cell: cell,
                 );
               }),
-              if (!hasSitOut && _draftRow != null)
-                TableRow(
-                  decoration:
-                      BoxDecoration(color: Colors.amber.shade50),
-                  children: [
-                    cell('${games.length + 1}'),
-                    ...players.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final p = entry.value;
-                      final editor = _draftRow!;
-                      return ScoreSpreadsheetCell(
-                        controller: editor.controllers[p.id]!,
-                        focusNode: editor.focusNodes[p.id]!,
-                        isLastInRow: i == players.length - 1,
-                        onChanged: (_) {
-                          if (editor.autoFilledPlayerId == p.id) {
-                            editor.autoFilledPlayerId = null;
-                          }
-                          editor.autoCalcLast(skipPlayerId: p.id);
-                          if (editor.parsedScoresOrNull() != null &&
-                              editor.autoFilledPlayerId != null) {
-                            _maybePersistSpreadsheetRow(
-                              db: db,
-                              editor: editor,
-                              existing: null,
-                            );
-                          }
-                        },
-                        onEditingComplete: () {
-                          editor.autoCalcLast();
-                          final idx =
-                              players.indexWhere((x) => x.id == p.id);
-                          if (idx >= 0 && idx < players.length - 1) {
-                            editor.focusNodes[players[idx + 1].id]!
-                                .requestFocus();
-                          } else {
-                            editor.focusNodes[p.id]!.unfocus();
-                          }
-                          _maybePersistSpreadsheetRow(
-                            db: db,
-                            editor: editor,
-                            existing: null,
-                          );
-                        },
-                      );
-                    }),
-                  ],
+              if (_draftRow != null)
+                _spreadsheetTableRow(
+                  db: db,
+                  players: players,
+                  editor: _draftRow!,
+                  existing: null,
+                  gameNumberLabel: '${games.length + 1}',
+                  decoration: BoxDecoration(color: Colors.amber.shade50),
+                  onDelete: null,
+                  cell: cell,
                 ),
               TableRow(
                 children: [
@@ -541,8 +400,7 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
                 ],
               ),
               TableRow(
-                decoration:
-                    BoxDecoration(color: Colors.grey.shade100),
+                decoration: BoxDecoration(color: Colors.grey.shade100),
                 children: [
                   cell('計', bold: true),
                   ...players.map((p) {
@@ -550,15 +408,13 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
                     return cell(
                       total >= 0 ? '+$total' : '$total',
                       bold: true,
-                      color:
-                          total >= 0 ? Colors.black : Colors.red,
+                      color: total >= 0 ? Colors.black : Colors.red,
                     );
                   }),
                 ],
               ),
               TableRow(
-                decoration:
-                    BoxDecoration(color: Colors.green.shade50),
+                decoration: BoxDecoration(color: Colors.green.shade50),
                 children: [
                   cell('円', bold: true),
                   ...players.map((p) {
@@ -567,32 +423,32 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
                     return cell(
                       '${yen >= 0 ? "+" : ""}${_formatYen(yen)}',
                       bold: true,
-                      color:
-                          yen >= 0 ? Colors.black : Colors.red,
+                      color: yen >= 0 ? Colors.black : Colors.red,
                     );
                   }),
                 ],
               ),
             ],
           ),
+          if (hasSitOut &&
+              _draftRow != null &&
+              !_draftRow!.sitOutCountOk)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '休みはちょうど ${_draftRow!.excess} 人にしてください（「休」タップ／席セル長押し）',
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: () => _openAdd(
-              context,
-              db,
-              gameDay,
-              players,
-              games,
-              useModal: hasSitOut,
-            ),
+            onPressed: () => _openAdd(db, gameDay, players, games),
             icon: const Icon(Icons.add),
             label: Text(
-              !hasSitOut && _draftRow != null
-                  ? '入力中の半荘があります'
-                  : '半荘を追加',
+              _draftRow != null ? '入力中の半荘があります' : '半荘を追加',
             ),
           ),
-          if (!hasSitOut && _draftRow != null)
+          if (_draftRow != null)
             TextButton(
               onPressed: () {
                 setState(() {
@@ -604,6 +460,83 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             ),
         ],
       ),
+    );
+  }
+
+  TableRow _spreadsheetTableRow({
+    required AppDatabase db,
+    required List<Player> players,
+    required HanchanRowEditor editor,
+    required Game? existing,
+    required String gameNumberLabel,
+    required Decoration? decoration,
+    required VoidCallback? onDelete,
+    required Widget Function(String text,
+            {bool bold, Color? color, Color? bg})
+        cell,
+  }) {
+    return TableRow(
+      decoration: decoration,
+      children: [
+        GestureDetector(
+          onLongPress: onDelete,
+          child: cell(gameNumberLabel),
+        ),
+        ...players.map((p) {
+          if (editor.isSittingOut(p.id)) {
+            return SitOutSpreadsheetCell(
+              onTap: () {
+                setState(() => editor.toggleSitOut(p.id));
+                _maybePersistSpreadsheetRow(
+                  db: db,
+                  editor: editor,
+                  existing: existing,
+                );
+              },
+              onLongPress: onDelete,
+            );
+          }
+          return ScoreSpreadsheetCell(
+            controller: editor.controllers[p.id]!,
+            focusNode: editor.focusNodes[p.id]!,
+            isLastInRow: editor.isLastSeated(p.id),
+            onLongPress: editor.hasSitOut
+                ? () {
+                    setState(() => editor.toggleSitOut(p.id));
+                    _maybePersistSpreadsheetRow(
+                      db: db,
+                      editor: editor,
+                      existing: existing,
+                    );
+                  }
+                : onDelete,
+            onChanged: (_) {
+              editor.dirty = true;
+              if (editor.autoFilledPlayerId == p.id) {
+                editor.autoFilledPlayerId = null;
+              }
+              editor.autoCalcLast(skipPlayerId: p.id);
+              if (editor.parsedScoresOrNull() != null &&
+                  editor.autoFilledPlayerId != null) {
+                _maybePersistSpreadsheetRow(
+                  db: db,
+                  editor: editor,
+                  existing: existing,
+                );
+              }
+            },
+            onEditingComplete: () {
+              editor.autoCalcLast();
+              editor.focusNextSeated(p.id);
+              _maybePersistSpreadsheetRow(
+                db: db,
+                editor: editor,
+                existing: existing,
+              );
+            },
+          );
+        }),
+      ],
     );
   }
 
@@ -685,9 +618,7 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
 
     editor.saving = true;
     try {
-      final gameNumber = existing?.gameNumber ??
-          // draft: 現時点の通し番号は呼び出し側で games.length+1
-          editor.gameNumber;
+      final gameNumber = existing?.gameNumber ?? editor.gameNumber;
       await _persistHanchan(
         db: db,
         existing: existing,
@@ -695,8 +626,8 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
         scores: scores,
       );
       editor.lastPersisted = Map<int, int>.from(scores);
+      editor.dirty = false;
       if (existing == null && mounted) {
-        // 新規行が保存されたらドラフトを閉じる（DB 行に移行）
         setState(() {
           if (identical(_draftRow, editor)) {
             _draftRow?.dispose();
@@ -710,107 +641,41 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
   }
 
   void _openAdd(
-    BuildContext context,
     AppDatabase db,
     GameDay gameDay,
     List<Player> players,
-    List<Game> games, {
-    required bool useModal,
-  }) {
+    List<Game> games,
+  ) {
     final gameNumber = games.length + 1;
-    if (useModal) {
-      _showHanchanDialog(
-        context: context,
-        db: db,
-        gameDay: gameDay,
-        players: players,
-        gameNumber: gameNumber,
-        existing: null,
-        initialScores: const {},
-        initialSittingOutIds: null,
-      );
-      return;
-    }
+    final playerIds = players.map((p) => p.id).toList();
+    final seatCount = gameDay.playerCount;
+
     if (_draftRow != null) {
-      // 既存ドラフトの先頭セルへフォーカス
-      final first = players.firstOrNull;
+      final first = _draftRow!.firstSeatedId;
       if (first != null) {
-        _draftRow!.focusNodes[first.id]?.requestFocus();
+        _draftRow!.focusNodes[first]?.requestFocus();
       }
       return;
     }
+
     setState(() {
       _draftRow = HanchanRowEditor(
         gameNumber: gameNumber,
-        playerIds: players.map((p) => p.id).toList(),
+        playerIds: playerIds,
+        seatCount: seatCount,
+        initialSittingOutIds: defaultSittingOutPlayerIds(
+          participantIds: playerIds,
+          seatCount: seatCount,
+          gameNumber: gameNumber,
+        ).toSet(),
       );
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final first = players.firstOrNull;
+      final first = _draftRow?.firstSeatedId;
       if (first != null) {
-        _draftRow?.focusNodes[first.id]?.requestFocus();
+        _draftRow?.focusNodes[first]?.requestFocus();
       }
     });
-  }
-
-  void _openEditModal(
-    BuildContext context,
-    AppDatabase db,
-    GameDay gameDay,
-    List<Player> players,
-    List<GameScore> scores,
-    Game game,
-  ) {
-    final initialScores = _scoresForGame(scores, game.id);
-    final initialSitOut =
-        _sittingOutForGame(players, scores, game.id);
-    _showHanchanDialog(
-      context: context,
-      db: db,
-      gameDay: gameDay,
-      players: players,
-      gameNumber: game.gameNumber,
-      existing: game,
-      initialScores: initialScores,
-      initialSittingOutIds: initialSitOut,
-    );
-  }
-
-  void _showHanchanDialog({
-    required BuildContext context,
-    required AppDatabase db,
-    required GameDay gameDay,
-    required List<Player> players,
-    required int gameNumber,
-    required Game? existing,
-    required Map<int, int> initialScores,
-    required Set<int>? initialSittingOutIds,
-  }) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => HanchanScoreForm(
-        gameNumber: gameNumber,
-        seatCount: gameDay.playerCount,
-        players: players,
-        initialScores: initialScores,
-        initialSittingOutIds: initialSittingOutIds,
-        onCancel: () => Navigator.pop(dialogContext),
-        onSave: ({
-          required sittingOutIds,
-          required scores,
-        }) async {
-          await _persistHanchan(
-            db: db,
-            existing: existing,
-            gameNumber: gameNumber,
-            scores: scores,
-          );
-          if (dialogContext.mounted) {
-            Navigator.pop(dialogContext);
-          }
-        },
-      ),
-    );
   }
 
   void _showDeleteGameDialog(
@@ -840,14 +705,14 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
               }
               if (context.mounted) Navigator.pop(context);
             },
-            child: const Text('削除',
-                style: TextStyle(color: Colors.red)),
+            child: const Text('削除', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
   }
 }
+
 
 class _ChipTab extends ConsumerWidget {
   final int gameDayId;
