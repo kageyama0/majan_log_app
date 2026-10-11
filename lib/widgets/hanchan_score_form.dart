@@ -22,9 +22,6 @@ class HanchanScoreForm extends StatefulWidget {
     required Map<int, int> scores,
   }) onSave;
 
-  /// true なら外側の枠（カード風）なし。インライン用。
-  final bool inline;
-
   const HanchanScoreForm({
     super.key,
     required this.gameNumber,
@@ -34,7 +31,6 @@ class HanchanScoreForm extends StatefulWidget {
     this.initialScores = const {},
     this.initialSittingOutIds,
     this.onCancel,
-    this.inline = false,
   });
 
   @override
@@ -194,18 +190,6 @@ class HanchanScoreFormState extends State<HanchanScoreForm> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.inline)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '半荘 ${widget.gameNumber}'
-              '${widget.initialScores.isEmpty ? '（追加）' : '（編集）'}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
         if (_excess > 0) ...[
           const Text(
             '休み（タップで変更）',
@@ -302,35 +286,8 @@ class HanchanScoreFormState extends State<HanchanScoreForm> {
             ),
           );
         }),
-        if (widget.inline) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              if (widget.onCancel != null)
-                TextButton(
-                  onPressed: _saving ? null : widget.onCancel,
-                  child: const Text('キャンセル'),
-                ),
-              const Spacer(),
-              ElevatedButton(
-                onPressed: !_canSave || _saving ? null : _handleSave,
-                child: Text(_saving ? '保存中…' : '保存'),
-              ),
-            ],
-          ),
-        ],
       ],
     );
-
-    if (widget.inline) {
-      return Material(
-        color: Colors.grey.shade50,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: body,
-        ),
-      );
-    }
 
     return AlertDialog(
       title: Text('半荘 ${widget.gameNumber}'),
