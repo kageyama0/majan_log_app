@@ -246,12 +246,16 @@ class HanchanRowEditor {
 }
 
 /// 表セル内の数値入力（枠なし・中央寄せ）。
+///
+/// [onMarkSitOut] があるとき、セル右上に「休」タップ領域を置く。
+/// TextField は長押しを飲み込むため、休み指定は長押しではなくこのタップで行う。
 class ScoreSpreadsheetCell extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool isLastInRow;
   final ValueChanged<String> onChanged;
   final VoidCallback onEditingComplete;
+  final VoidCallback? onMarkSitOut;
   final VoidCallback? onLongPress;
 
   const ScoreSpreadsheetCell({
@@ -261,56 +265,101 @@ class ScoreSpreadsheetCell extends StatelessWidget {
     required this.isLastInRow,
     required this.onChanged,
     required this.onEditingComplete,
+    this.onMarkSitOut,
     this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onLongPress: onLongPress,
-      child: ListenableBuilder(
-        listenable: Listenable.merge([focusNode, controller]),
-        builder: (context, _) {
-          final v = int.tryParse(controller.text.trim());
-          return ColoredBox(
-            color: focusNode.hasFocus
-                ? Colors.blue.shade50
-                : Colors.transparent,
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: (v != null && v < 0) ? Colors.red : Colors.black,
-              ),
-              keyboardType:
-                  const TextInputType.numberWithOptions(signed: true),
-              textInputAction:
-                  isLastInRow ? TextInputAction.done : TextInputAction.next,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
-              ],
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding:
-                    EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                hintText: '—',
-                hintStyle: TextStyle(color: Colors.black26),
-              ),
-              onChanged: onChanged,
-              onEditingComplete: onEditingComplete,
-              onTapOutside: (_) => onEditingComplete(),
+    return ListenableBuilder(
+      listenable: Listenable.merge([focusNode, controller]),
+      builder: (context, _) {
+        final v = int.tryParse(controller.text.trim());
+        final field = TextField(
+          controller: controller,
+          focusNode: focusNode,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: (v != null && v < 0) ? Colors.red : Colors.black,
+          ),
+          keyboardType:
+              const TextInputType.numberWithOptions(signed: true),
+          textInputAction:
+              isLastInRow ? TextInputAction.done : TextInputAction.next,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
+          ],
+          decoration: InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            // 右上「休」ボタンと重ならないようやや余白
+            contentPadding: EdgeInsets.fromLTRB(
+              4,
+              onMarkSitOut != null ? 14 : 10,
+              onMarkSitOut != null ? 18 : 4,
+              10,
             ),
+            hintText: '—',
+            hintStyle: const TextStyle(color: Colors.black26),
+          ),
+          onChanged: onChanged,
+          onEditingComplete: onEditingComplete,
+          onTapOutside: (_) => onEditingComplete(),
+        );
+
+        Widget body = ColoredBox(
+          color: focusNode.hasFocus
+              ? Colors.blue.shade50
+              : Colors.transparent,
+          child: field,
+        );
+
+        if (onMarkSitOut != null) {
+          body = Stack(
+            children: [
+              body,
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onMarkSitOut,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 2, 4, 6),
+                      child: Text(
+                        '休',
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.1,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
-        },
-      ),
+        } else if (onLongPress != null) {
+          // 余剰なし: 長押し削除（TextField と競合しやすいので #列推奨だが互換で残す）
+          body = GestureDetector(
+            onLongPress: onLongPress,
+            behavior: HitTestBehavior.translucent,
+            child: body,
+          );
+        }
+
+        return body;
+      },
     );
   }
 }
 
-/// 休みセル。「休」表示。タップで休み解除（トグル）。
+/// 休みセル。「休」表示。タップで席に戻す。
 class SitOutSpreadsheetCell extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -323,19 +372,33 @@ class SitOutSpreadsheetCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        color: Colors.grey.shade100,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        alignment: Alignment.center,
-        child: Text(
-          '休',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade600,
-            fontWeight: FontWeight.w500,
+    return Material(
+      color: Colors.grey.shade100,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '休',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                'タップで復帰',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
           ),
         ),
       ),

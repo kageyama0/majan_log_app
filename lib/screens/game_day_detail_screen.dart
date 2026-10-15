@@ -343,8 +343,8 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
 
     final hint = hasSitOut
         ? '参加者${players.length}人 / 席$seatCount人\n'
-            'セル直接入力・「休」タップで交代 / 席セル長押しで休み / #長押しで削除'
-        : 'セルをタップして直接入力（次へで隣へ） / 長押しで削除';
+            '点数はセル入力・右上「休」で休み指定・「休」マスタップで復帰 / #長押しで削除'
+        : 'セルをタップして直接入力（次へで隣へ） / #長押しで削除';
 
     return Padding(
       padding: const EdgeInsets.all(8),
@@ -436,7 +436,8 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '休みはちょうど ${_draftRow!.excess} 人にしてください（「休」タップ／席セル長押し）',
+                '休みはちょうど ${_draftRow!.excess} 人にしてください'
+                '（席セル右上の「休」／「休」マスをタップ）',
                 style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             ),
@@ -500,7 +501,7 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             controller: editor.controllers[p.id]!,
             focusNode: editor.focusNodes[p.id]!,
             isLastInRow: editor.isLastSeated(p.id),
-            onLongPress: editor.hasSitOut
+            onMarkSitOut: editor.hasSitOut
                 ? () {
                     setState(() => editor.toggleSitOut(p.id));
                     _maybePersistSpreadsheetRow(
@@ -509,7 +510,8 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
                       existing: existing,
                     );
                   }
-                : onDelete,
+                : null,
+            onLongPress: editor.hasSitOut ? null : onDelete,
             onChanged: (_) {
               editor.dirty = true;
               if (editor.autoFilledPlayerId == p.id) {
