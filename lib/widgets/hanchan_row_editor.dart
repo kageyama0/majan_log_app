@@ -247,15 +247,13 @@ class HanchanRowEditor {
 
 /// 表セル内の数値入力（枠なし・中央寄せ）。
 ///
-/// [onMarkSitOut] があるとき、セル右上に「休」タップ領域を置く。
-/// TextField は長押しを飲み込むため、休み指定は長押しではなくこのタップで行う。
+/// 休み指定はプレイヤー名ヘッダーの長押しで行う（TextField と競合しない）。
 class ScoreSpreadsheetCell extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool isLastInRow;
   final ValueChanged<String> onChanged;
   final VoidCallback onEditingComplete;
-  final VoidCallback? onMarkSitOut;
   final VoidCallback? onLongPress;
 
   const ScoreSpreadsheetCell({
@@ -265,7 +263,6 @@ class ScoreSpreadsheetCell extends StatelessWidget {
     required this.isLastInRow,
     required this.onChanged,
     required this.onEditingComplete,
-    this.onMarkSitOut,
     this.onLongPress,
   });
 
@@ -290,18 +287,12 @@ class ScoreSpreadsheetCell extends StatelessWidget {
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
           ],
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             isDense: true,
             border: InputBorder.none,
-            // 右上「休」ボタンと重ならないようやや余白
-            contentPadding: EdgeInsets.fromLTRB(
-              4,
-              onMarkSitOut != null ? 14 : 10,
-              onMarkSitOut != null ? 18 : 4,
-              10,
-            ),
+            contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
             hintText: '—',
-            hintStyle: const TextStyle(color: Colors.black26),
+            hintStyle: TextStyle(color: Colors.black26),
           ),
           onChanged: onChanged,
           onEditingComplete: onEditingComplete,
@@ -315,36 +306,7 @@ class ScoreSpreadsheetCell extends StatelessWidget {
           child: field,
         );
 
-        if (onMarkSitOut != null) {
-          body = Stack(
-            children: [
-              body,
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: onMarkSitOut,
-                    borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 2, 4, 6),
-                      child: Text(
-                        '休',
-                        style: TextStyle(
-                          fontSize: 10,
-                          height: 1.1,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        } else if (onLongPress != null) {
+        if (onLongPress != null) {
           // 余剰なし: 長押し削除（TextField と競合しやすいので #列推奨だが互換で残す）
           body = GestureDetector(
             onLongPress: onLongPress,

@@ -343,8 +343,10 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
 
     final hint = hasSitOut
         ? '参加者${players.length}人 / 席$seatCount人\n'
-            '点数はセル入力・右上「休」で休み指定・「休」マスタップで復帰 / #長押しで削除'
+            '点数はセル入力・名前長押しで休み指定・「休」マスタップで復帰 / #長押しで削除'
         : 'セルをタップして直接入力（次へで隣へ） / #長押しで削除';
+
+    final activeEditor = hasSitOut ? _resolveActiveEditor(games) : null;
 
     return Padding(
       padding: const EdgeInsets.all(8),
@@ -365,7 +367,20 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
                 decoration: BoxDecoration(color: Colors.grey.shade200),
                 children: [
                   cell('#', bold: true),
-                  ...players.map((p) => cell(p.name, bold: true)),
+                  ...players.map((p) {
+                    final nameCell = cell(p.name, bold: true);
+                    if (!hasSitOut) return nameCell;
+                    // 名前は Text（TextFieldではない）なので長押しが確実に効く
+                    return GestureDetector(
+                      onLongPress: () => _onPlayerNameLongPress(
+                        db: db,
+                        games: games,
+                        playerId: p.id,
+                      ),
+                      behavior: HitTestBehavior.opaque,
+                      child: nameCell,
+                    );
+                  }),
                 ],
               ),
               ...games.map((game) {
@@ -431,13 +446,13 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             ],
           ),
           if (hasSitOut &&
-              _draftRow != null &&
-              !_draftRow!.sitOutCountOk)
+              activeEditor != null &&
+              !activeEditor.sitOutCountOk)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '休みはちょうど ${_draftRow!.excess} 人にしてください'
-                '（席セル右上の「休」／「休」マスをタップ）',
+                '休みはちょうど ${activeEditor.excess} 人にしてください'
+                '（名前を長押し／「休」マスをタップ）',
                 style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             ),
@@ -464,13 +479,63 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
     );
   }
 
+  /// 入力中の半荘: フォーカス中の行 → 新規ドラフト行 → dirty な既存行。
+  HanchanRowEditor? _resolveActiveEditor(List<Game> games) {
+    for (final game in games) {
+      final editor = _rowEditors[game.id];
+      if (editor != null && editor.anyFocused) return editor;
+    }
+    if (_draftRow != null && _draftRow!.anyFocused) return _draftRow;
+    if (_draftRow != null) return _draftRow;
+    for (final game in games) {
+      final editor = _rowEditors[game.id];
+      if (editor != null && editor.dirty) return editor;
+    }
+    return null;
+  }
+
+  Game? _gameForEditor(List<Game> games, HanchanRowEditor editor) {
+    final id = editor.gameId;
+    if (id == null) return null;
+    for (final g in games) {
+      if (g.id == id) return g;
+    }
+    return null;
+  }
+
+  void _onPlayerNameLongPress({
+    required AppDatabase db,
+    required List<Game> games,
+    required int playerId,
+  }) {
+    final editor = _resolveActiveEditor(games);
+    if (editor == null || !editor.hasSitOut) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '編集中の半荘がありません。'
+            '半荘を追加するか、点数セルをタップしてから名前を長押ししてください',
+          ),
+        ),
+      );
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    setState(() => editor.toggleSitOut(playerId));
+    _maybePersistSpreadsheetRow(
+      db: db,
+      editor: editor,
+      existing: _gameForEditor(games, editor),
+    );
+  }
+
   TableRow _spreadsheetTableRow({
     required AppDatabase db,
     required List<Player> players,
     required HanchanRowEditor editor,
     required Game? existing,
     required String gameNumberLabel,
-    required Decoration? decoration,
+    required BoxDecoration? decoration,
     required VoidCallback? onDelete,
     required Widget Function(String text,
             {bool bold, Color? color, Color? bg})
@@ -501,16 +566,6 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             controller: editor.controllers[p.id]!,
             focusNode: editor.focusNodes[p.id]!,
             isLastInRow: editor.isLastSeated(p.id),
-            onMarkSitOut: editor.hasSitOut
-                ? () {
-                    setState(() => editor.toggleSitOut(p.id));
-                    _maybePersistSpreadsheetRow(
-                      db: db,
-                      editor: editor,
-                      existing: existing,
-                    );
-                  }
-                : null,
             onLongPress: editor.hasSitOut ? null : onDelete,
             onChanged: (_) {
               editor.dirty = true;
