@@ -7,6 +7,7 @@ import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/screens/chip_settlement_screen.dart';
 import 'package:majan_log_app/utils/sit_out_rotation.dart';
 import 'package:majan_log_app/widgets/hanchan_row_editor.dart';
+import 'package:majan_log_app/widgets/yakuman_section.dart';
 
 class GameDayDetailScreen extends ConsumerStatefulWidget {
   final int gameDayId;
@@ -42,7 +43,7 @@ class _GameDayDetailScreenState
         title: const Text('対戦日を削除'),
         content: const Text(
           'この対戦日を削除しますか？\n'
-          '半荘・スコア・チップ記録もすべて削除されます。',
+          '半荘・スコア・チップ・役満記録もすべて削除されます。',
         ),
         actions: [
           TextButton(
@@ -474,6 +475,14 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
               },
               child: const Text('新規行をキャンセル'),
             ),
+          const SizedBox(height: 8),
+          const Divider(),
+          YakumanSection(
+            db: db,
+            gameDayId: gameDayId,
+            players: players,
+            games: games,
+          ),
         ],
       ),
     );
@@ -749,6 +758,9 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
           ),
           TextButton(
             onPressed: () async {
+              await (db.delete(db.yakumans)
+                    ..where((t) => t.gameId.equals(game.id)))
+                  .go();
               await (db.delete(db.gameScores)
                     ..where((t) => t.gameId.equals(game.id)))
                   .go();

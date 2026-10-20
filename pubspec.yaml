@@ -31,22 +31,18 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  drift: ^2.25.0
+  drift: ^2.35.0
   sqlite3_flutter_libs: ^0.5.0
   path_provider: ^2.1.0
   path: ^1.9.0
   flutter_riverpod: ^2.6.0
-  riverpod_annotation: ^2.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  drift_dev: ^2.25.0
-  build_runner: ^2.4.0
-  riverpod_generator: ^2.6.0
-  custom_lint:
-  riverpod_lint:
+  drift_dev: ^2.35.0
+  build_runner: ^2.10.1
   flutter_launcher_icons: ^0.14.3
 
 flutter_launcher_icons:
@@ -104,3 +100,4 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+

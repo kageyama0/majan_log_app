@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
+import 'package:majan_log_app/utils/player_stats_calc.dart';
 
 enum _FilterMode { all, sanma, yonma }
 
@@ -78,10 +79,12 @@ class _PlayerDetailScreenState
           ),
           const SizedBox(height: 16),
           _summaryCard(filtered),
-          if (_filter != _FilterMode.all) ...[
+          if (filtered.totalGames > 0) ...[
             const SizedBox(height: 16),
             _rankCard(filtered),
           ],
+          const SizedBox(height: 16),
+          _yakumanCard(filtered),
           const SizedBox(height: 16),
           const Text('対戦履歴',
               style: TextStyle(
@@ -99,7 +102,7 @@ class _PlayerDetailScreenState
                     const DataColumn(label: Text('形式')),
                   const DataColumn(label: Text('半荘数')),
                   const DataColumn(label: Text('スコア計')),
-                  const DataColumn(label: Text('チップ純収支')),
+                  const DataColumn(label: Text('チップ収支')),
                 ],
                 rows: filtered.gameDayRecords.map((r) {
                   return DataRow(cells: [
@@ -135,6 +138,7 @@ class _PlayerDetailScreenState
   _FilteredDetail _applyFilter(_PlayerDetail detail) {
     List<_GameDayRecord> records;
     List<_GameRank> ranks;
+    List<_YakumanRecord> yakumans;
 
     switch (_filter) {
       case _FilterMode.sanma:
@@ -144,6 +148,9 @@ class _PlayerDetailScreenState
         ranks = detail.gameRanks
             .where((r) => r.playerCount == 3)
             .toList();
+        yakumans = detail.yakumans
+            .where((y) => y.playerCount == 3)
+            .toList();
       case _FilterMode.yonma:
         records = detail.gameDayRecords
             .where((r) => r.playerCount == 4)
@@ -151,9 +158,13 @@ class _PlayerDetailScreenState
         ranks = detail.gameRanks
             .where((r) => r.playerCount == 4)
             .toList();
+        yakumans = detail.yakumans
+            .where((y) => y.playerCount == 4)
+            .toList();
       case _FilterMode.all:
         records = detail.gameDayRecords;
         ranks = detail.gameRanks;
+        yakumans = detail.yakumans;
     }
 
     final gameDayCount = records.length;
@@ -170,16 +181,26 @@ class _PlayerDetailScreenState
       rankCounts[i] = 0;
     }
     for (final r in ranks) {
-      rankCounts[r.rank] = (rankCounts[r.rank] ?? 0) + 1;
+      if (r.rank >= 1 && r.rank <= maxRank) {
+        rankCounts[r.rank] = (rankCounts[r.rank] ?? 0) + 1;
+      }
     }
+
+    final rate = rentaiRate(
+      firstPlaceCount: rankCounts[1] ?? 0,
+      secondPlaceCount: rankCounts[2] ?? 0,
+      totalGames: totalGames,
+    );
 
     return _FilteredDetail(
       gameDayCount: gameDayCount,
       totalGames: totalGames,
       totalScore: totalScore,
       totalChipNet: totalChipNet,
+      rentaiRate: rate,
       rankCounts: rankCounts,
       gameDayRecords: records,
+      yakumans: yakumans,
     );
   }
 
@@ -204,7 +225,7 @@ class _PlayerDetailScreenState
                     color: detail.totalScore >= 0
                         ? Colors.green
                         : Colors.red),
-                _statColumn('累計チップ', _fmt(detail.totalChipNet),
+                _statColumn('チップ収支', _fmt(detail.totalChipNet),
                     color: detail.totalChipNet >= 0
                         ? Colors.green
                         : Colors.red),
@@ -215,8 +236,16 @@ class _PlayerDetailScreenState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _statColumn('平均スコア/半荘',
-                      _fmtDouble(detail.totalScore / detail.totalGames)),
+                  _statColumn(
+                    '連対率',
+                    detail.rentaiRate == null
+                        ? '-'
+                        : '${(detail.rentaiRate! * 100).toStringAsFixed(1)}%',
+                  ),
+                  _statColumn(
+                    '平均スコア/半荘',
+                    _fmtDouble(detail.totalScore / detail.totalGames),
+                  ),
                 ],
               ),
             ],
@@ -227,8 +256,6 @@ class _PlayerDetailScreenState
   }
 
   Widget _rankCard(_FilteredDetail detail) {
-    if (detail.totalGames == 0) return const SizedBox.shrink();
-
     final rankCounts = detail.rankCounts;
     final total = detail.totalGames;
     final rankLabels = ['', '1着', '2着', '3着', '4着'];
@@ -282,6 +309,80 @@ class _PlayerDetailScreenState
                 ),
               );
             }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _yakumanCard(_FilteredDetail detail) {
+    final yakumans = detail.yakumans;
+    final counts = <String, int>{};
+    for (final y in yakumans) {
+      counts[y.yakumanName] = (counts[y.yakumanName] ?? 0) + 1;
+    }
+    final sortedNames = counts.keys.toList()
+      ..sort((a, b) {
+        final c = counts[b]!.compareTo(counts[a]!);
+        if (c != 0) return c;
+        return a.compareTo(b);
+      });
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('役満',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Text(
+                  '${yakumans.length}回',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (yakumans.isEmpty)
+              Text(
+                'まだ役満記録がありません',
+                style: TextStyle(color: Colors.grey.shade700),
+              )
+            else ...[
+              if (sortedNames.isNotEmpty) ...[
+                ...sortedNames.map((name) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(name)),
+                        Text('${counts[name]}回'),
+                      ],
+                    ),
+                  );
+                }),
+                const Divider(height: 20),
+              ],
+              const Text('履歴',
+                  style: TextStyle(
+                      fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 4),
+              ...yakumans.map((y) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(
+                    '${y.dateStr}  半荘${y.gameNumber}  ${y.yakumanName}'
+                    '${_filter == _FilterMode.all ? '（${y.type}）' : ''}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                );
+              }),
+            ],
           ],
         ),
       ),
@@ -402,6 +503,9 @@ class _PlayerDetailScreenState
           ..where((t) => t.playerId.equals(widget.playerId)))
         .get();
     final allChipLoans = await db.select(db.chipLoans).get();
+    final allYakumans = await (db.select(db.yakumans)
+          ..where((t) => t.playerId.equals(widget.playerId)))
+        .get();
 
     final myScores = allScores
         .where((s) => s.playerId == widget.playerId)
@@ -409,6 +513,7 @@ class _PlayerDetailScreenState
 
     final records = <_GameDayRecord>[];
     final gameRanks = <_GameRank>[];
+    final yakumanRecords = <_YakumanRecord>[];
 
     for (final gdId in gameDayIds) {
       final gd = allGameDays.where((g) => g.id == gdId).firstOrNull;
@@ -429,17 +534,22 @@ class _PlayerDetailScreenState
           .firstOrNull;
       final chipDiff = chipSettlement?.chipDiff ?? 0;
 
-      int loanBalance = 0;
+      int borrowed = 0;
+      int lent = 0;
       for (final loan in allChipLoans) {
         if (loan.gameDayId != gdId) continue;
         if (loan.borrowerId == widget.playerId) {
-          loanBalance += loan.amount;
+          borrowed += loan.amount;
         }
         if (loan.lenderId == widget.playerId) {
-          loanBalance -= loan.amount;
+          lent += loan.amount;
         }
       }
-      final chipNet = chipDiff - loanBalance;
+      final chipNet = chipNetBalance(
+        chipDiff: chipDiff,
+        borrowedAmount: borrowed,
+        lentAmount: lent,
+      );
 
       final dateStr =
           '${gd.date.year}/${gd.date.month}/${gd.date.day}';
@@ -474,12 +584,34 @@ class _PlayerDetailScreenState
       }
     }
 
+    for (final y in allYakumans) {
+      final game = allGames.where((g) => g.id == y.gameId).firstOrNull;
+      if (game == null) continue;
+      final gd =
+          allGameDays.where((g) => g.id == game.gameDayId).firstOrNull;
+      if (gd == null) continue;
+      yakumanRecords.add(_YakumanRecord(
+        dateStr:
+            '${gd.date.year}/${gd.date.month}/${gd.date.day}',
+        gameNumber: game.gameNumber,
+        yakumanName: y.yakumanName,
+        playerCount: gd.playerCount,
+        type: gd.playerCount == 3 ? '三麻' : '四麻',
+      ));
+    }
+
     records.sort((a, b) => b.dateStr.compareTo(a.dateStr));
+    yakumanRecords.sort((a, b) {
+      final d = b.dateStr.compareTo(a.dateStr);
+      if (d != 0) return d;
+      return b.gameNumber.compareTo(a.gameNumber);
+    });
 
     return _PlayerDetail(
       name: player.name,
       gameDayRecords: records,
       gameRanks: gameRanks,
+      yakumans: yakumanRecords,
     );
   }
 }
@@ -488,11 +620,13 @@ class _PlayerDetail {
   final String name;
   final List<_GameDayRecord> gameDayRecords;
   final List<_GameRank> gameRanks;
+  final List<_YakumanRecord> yakumans;
 
   _PlayerDetail({
     required this.name,
     required this.gameDayRecords,
     required this.gameRanks,
+    required this.yakumans,
   });
 }
 
@@ -501,16 +635,20 @@ class _FilteredDetail {
   final int totalGames;
   final int totalScore;
   final int totalChipNet;
+  final double? rentaiRate;
   final Map<int, int> rankCounts;
   final List<_GameDayRecord> gameDayRecords;
+  final List<_YakumanRecord> yakumans;
 
   _FilteredDetail({
     required this.gameDayCount,
     required this.totalGames,
     required this.totalScore,
     required this.totalChipNet,
+    required this.rentaiRate,
     required this.rankCounts,
     required this.gameDayRecords,
+    required this.yakumans,
   });
 }
 
@@ -537,4 +675,20 @@ class _GameRank {
   final int playerCount;
 
   _GameRank({required this.rank, required this.playerCount});
+}
+
+class _YakumanRecord {
+  final String dateStr;
+  final int gameNumber;
+  final String yakumanName;
+  final int playerCount;
+  final String type;
+
+  _YakumanRecord({
+    required this.dateStr,
+    required this.gameNumber,
+    required this.yakumanName,
+    required this.playerCount,
+    required this.type,
+  });
 }

@@ -81,6 +81,17 @@ class ChipSettlements extends Table {
   IntColumn get chipDiff => integer()();
 }
 
+/// 半荘ごとの役満記録（誰が・どの役満）。
+class Yakumans extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get gameId => integer().references(Games, #id)();
+  IntColumn get playerId =>
+      integer().references(Players, #id)();
+  TextColumn get yakumanName => text().withLength(min: 1, max: 50)();
+  DateTimeColumn get createdAt =>
+      dateTime().withDefault(currentDateAndTime)();
+}
+
 @DriftDatabase(tables: [
   Players,
   GameDays,
@@ -90,6 +101,7 @@ class ChipSettlements extends Table {
   ChipLoans,
   ChipSettlements,
   AppSettings,
+  Yakumans,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -98,7 +110,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -110,6 +122,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 3) {
             await migrator.addColumn(gameDays, gameDays.venueFee);
+          }
+          if (from < 4) {
+            await migrator.createTable(yakumans);
           }
         },
       );
@@ -137,6 +152,9 @@ class AppDatabase extends _$AppDatabase {
       final gameIds = dayGames.map((g) => g.id).toList();
 
       if (gameIds.isNotEmpty) {
+        await (delete(yakumans)
+              ..where((t) => t.gameId.isIn(gameIds)))
+            .go();
         await (delete(gameScores)
               ..where((t) => t.gameId.isIn(gameIds)))
             .go();
@@ -170,6 +188,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> seed() async {
     final existing = await select(players).get();
     if (existing.isNotEmpty) {
+      await delete(yakumans).go();
       await delete(chipSettlements).go();
       await delete(chipLoans).go();
       await delete(gameScores).go();
@@ -220,6 +239,8 @@ class AppDatabase extends _$AppDatabase {
       await into(gameScores).insert(GameScoresCompanion.insert(
           gameId: g1, playerId: e[0], score: e[1]));
     }
+    await into(yakumans).insert(YakumansCompanion.insert(
+        gameId: g1, playerId: p1, yakumanName: '大三元'));
 
     // 半荘2
     final g2 = await into(games).insert(

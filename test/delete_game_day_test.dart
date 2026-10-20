@@ -75,6 +75,13 @@ void main() {
             chipDiff: 1,
           ),
         );
+    await db.into(db.yakumans).insert(
+          YakumansCompanion.insert(
+            gameId: gameId,
+            playerId: p1,
+            yakumanName: '四暗刻',
+          ),
+        );
 
     return gdId;
   }
@@ -99,6 +106,7 @@ void main() {
     expect(await db.select(db.gameScores).get(), isEmpty);
     expect(await db.select(db.chipLoans).get(), isEmpty);
     expect(await db.select(db.chipSettlements).get(), isEmpty);
+    expect(await db.select(db.yakumans).get(), isEmpty);
 
     // 雀士マスタは残る
     expect(await db.select(db.players).get(), hasLength(4));

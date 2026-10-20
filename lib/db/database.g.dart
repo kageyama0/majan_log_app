@@ -2517,6 +2517,368 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $YakumansTable extends Yakumans with TableInfo<$YakumansTable, Yakuman> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $YakumansTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _gameIdMeta = const VerificationMeta('gameId');
+  @override
+  late final GeneratedColumn<int> gameId = GeneratedColumn<int>(
+    'game_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES games (id)',
+    ),
+  );
+  static const VerificationMeta _playerIdMeta = const VerificationMeta(
+    'playerId',
+  );
+  @override
+  late final GeneratedColumn<int> playerId = GeneratedColumn<int>(
+    'player_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES players (id)',
+    ),
+  );
+  static const VerificationMeta _yakumanNameMeta = const VerificationMeta(
+    'yakumanName',
+  );
+  @override
+  late final GeneratedColumn<String> yakumanName = GeneratedColumn<String>(
+    'yakuman_name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 50,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    gameId,
+    playerId,
+    yakumanName,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'yakumans';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Yakuman> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('game_id')) {
+      context.handle(
+        _gameIdMeta,
+        gameId.isAcceptableOrUnknown(data['game_id']!, _gameIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_gameIdMeta);
+    }
+    if (data.containsKey('player_id')) {
+      context.handle(
+        _playerIdMeta,
+        playerId.isAcceptableOrUnknown(data['player_id']!, _playerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playerIdMeta);
+    }
+    if (data.containsKey('yakuman_name')) {
+      context.handle(
+        _yakumanNameMeta,
+        yakumanName.isAcceptableOrUnknown(
+          data['yakuman_name']!,
+          _yakumanNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_yakumanNameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Yakuman map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Yakuman(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      gameId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}game_id'],
+      )!,
+      playerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}player_id'],
+      )!,
+      yakumanName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}yakuman_name'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $YakumansTable createAlias(String alias) {
+    return $YakumansTable(attachedDatabase, alias);
+  }
+}
+
+class Yakuman extends DataClass implements Insertable<Yakuman> {
+  final int id;
+  final int gameId;
+  final int playerId;
+  final String yakumanName;
+  final DateTime createdAt;
+  const Yakuman({
+    required this.id,
+    required this.gameId,
+    required this.playerId,
+    required this.yakumanName,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['game_id'] = Variable<int>(gameId);
+    map['player_id'] = Variable<int>(playerId);
+    map['yakuman_name'] = Variable<String>(yakumanName);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  YakumansCompanion toCompanion(bool nullToAbsent) {
+    return YakumansCompanion(
+      id: Value(id),
+      gameId: Value(gameId),
+      playerId: Value(playerId),
+      yakumanName: Value(yakumanName),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Yakuman.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Yakuman(
+      id: serializer.fromJson<int>(json['id']),
+      gameId: serializer.fromJson<int>(json['gameId']),
+      playerId: serializer.fromJson<int>(json['playerId']),
+      yakumanName: serializer.fromJson<String>(json['yakumanName']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'gameId': serializer.toJson<int>(gameId),
+      'playerId': serializer.toJson<int>(playerId),
+      'yakumanName': serializer.toJson<String>(yakumanName),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Yakuman copyWith({
+    int? id,
+    int? gameId,
+    int? playerId,
+    String? yakumanName,
+    DateTime? createdAt,
+  }) => Yakuman(
+    id: id ?? this.id,
+    gameId: gameId ?? this.gameId,
+    playerId: playerId ?? this.playerId,
+    yakumanName: yakumanName ?? this.yakumanName,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  Yakuman copyWithCompanion(YakumansCompanion data) {
+    return Yakuman(
+      id: data.id.present ? data.id.value : this.id,
+      gameId: data.gameId.present ? data.gameId.value : this.gameId,
+      playerId: data.playerId.present ? data.playerId.value : this.playerId,
+      yakumanName: data.yakumanName.present
+          ? data.yakumanName.value
+          : this.yakumanName,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Yakuman(')
+          ..write('id: $id, ')
+          ..write('gameId: $gameId, ')
+          ..write('playerId: $playerId, ')
+          ..write('yakumanName: $yakumanName, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, gameId, playerId, yakumanName, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Yakuman &&
+          other.id == this.id &&
+          other.gameId == this.gameId &&
+          other.playerId == this.playerId &&
+          other.yakumanName == this.yakumanName &&
+          other.createdAt == this.createdAt);
+}
+
+class YakumansCompanion extends UpdateCompanion<Yakuman> {
+  final Value<int> id;
+  final Value<int> gameId;
+  final Value<int> playerId;
+  final Value<String> yakumanName;
+  final Value<DateTime> createdAt;
+  const YakumansCompanion({
+    this.id = const Value.absent(),
+    this.gameId = const Value.absent(),
+    this.playerId = const Value.absent(),
+    this.yakumanName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  YakumansCompanion.insert({
+    this.id = const Value.absent(),
+    required int gameId,
+    required int playerId,
+    required String yakumanName,
+    this.createdAt = const Value.absent(),
+  }) : gameId = Value(gameId),
+       playerId = Value(playerId),
+       yakumanName = Value(yakumanName);
+  static Insertable<Yakuman> custom({
+    Expression<int>? id,
+    Expression<int>? gameId,
+    Expression<int>? playerId,
+    Expression<String>? yakumanName,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (gameId != null) 'game_id': gameId,
+      if (playerId != null) 'player_id': playerId,
+      if (yakumanName != null) 'yakuman_name': yakumanName,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  YakumansCompanion copyWith({
+    Value<int>? id,
+    Value<int>? gameId,
+    Value<int>? playerId,
+    Value<String>? yakumanName,
+    Value<DateTime>? createdAt,
+  }) {
+    return YakumansCompanion(
+      id: id ?? this.id,
+      gameId: gameId ?? this.gameId,
+      playerId: playerId ?? this.playerId,
+      yakumanName: yakumanName ?? this.yakumanName,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (gameId.present) {
+      map['game_id'] = Variable<int>(gameId.value);
+    }
+    if (playerId.present) {
+      map['player_id'] = Variable<int>(playerId.value);
+    }
+    if (yakumanName.present) {
+      map['yakuman_name'] = Variable<String>(yakumanName.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('YakumansCompanion(')
+          ..write('id: $id, ')
+          ..write('gameId: $gameId, ')
+          ..write('playerId: $playerId, ')
+          ..write('yakumanName: $yakumanName, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2530,6 +2892,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $YakumansTable yakumans = $YakumansTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2543,6 +2906,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     chipLoans,
     chipSettlements,
     appSettings,
+    yakumans,
   ];
 }
 
@@ -2566,7 +2930,7 @@ final class $$PlayersTableReferences
   static MultiTypedResultKey<$GameDayPlayersTable, List<GameDayPlayer>>
   _gameDayPlayersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.gameDayPlayers,
-    aliasName: $_aliasNameGenerator(db.players.id, db.gameDayPlayers.playerId),
+    aliasName: 'players__id__game_day_players__player_id',
   );
 
   $$GameDayPlayersTableProcessedTableManager get gameDayPlayersRefs {
@@ -2584,7 +2948,7 @@ final class $$PlayersTableReferences
   static MultiTypedResultKey<$GameScoresTable, List<GameScore>>
   _gameScoresRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.gameScores,
-    aliasName: $_aliasNameGenerator(db.players.id, db.gameScores.playerId),
+    aliasName: 'players__id__game_scores__player_id',
   );
 
   $$GameScoresTableProcessedTableManager get gameScoresRefs {
@@ -2602,7 +2966,7 @@ final class $$PlayersTableReferences
   static MultiTypedResultKey<$ChipSettlementsTable, List<ChipSettlement>>
   _chipSettlementsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.chipSettlements,
-    aliasName: $_aliasNameGenerator(db.players.id, db.chipSettlements.playerId),
+    aliasName: 'players__id__chip_settlements__player_id',
   );
 
   $$ChipSettlementsTableProcessedTableManager get chipSettlementsRefs {
@@ -2614,6 +2978,25 @@ final class $$PlayersTableReferences
     final cache = $_typedResult.readTableOrNull(
       _chipSettlementsRefsTable($_db),
     );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$YakumansTable, List<Yakuman>> _yakumansRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.yakumans,
+    aliasName: 'players__id__yakumans__player_id',
+  );
+
+  $$YakumansTableProcessedTableManager get yakumansRefs {
+    final manager = $$YakumansTableTableManager(
+      $_db,
+      $_db.yakumans,
+    ).filter((f) => f.playerId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_yakumansRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -2710,6 +3093,31 @@ class $$PlayersTableFilterComposer
           }) => $$ChipSettlementsTableFilterComposer(
             $db: $db,
             $table: $db.chipSettlements,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> yakumansRefs(
+    Expression<bool> Function($$YakumansTableFilterComposer f) f,
+  ) {
+    final $$YakumansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.yakumans,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$YakumansTableFilterComposer(
+            $db: $db,
+            $table: $db.yakumans,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2837,6 +3245,31 @@ class $$PlayersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> yakumansRefs<T extends Object>(
+    Expression<T> Function($$YakumansTableAnnotationComposer a) f,
+  ) {
+    final $$YakumansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.yakumans,
+      getReferencedColumn: (t) => t.playerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$YakumansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.yakumans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PlayersTableTableManager
@@ -2856,6 +3289,7 @@ class $$PlayersTableTableManager
             bool gameDayPlayersRefs,
             bool gameScoresRefs,
             bool chipSettlementsRefs,
+            bool yakumansRefs,
           })
         > {
   $$PlayersTableTableManager(_$AppDatabase db, $PlayersTable table)
@@ -2888,7 +3322,7 @@ class $$PlayersTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$PlayersTable, Player>(table),
                   $$PlayersTableReferences(db, table, e),
                 ),
               )
@@ -2898,6 +3332,7 @@ class $$PlayersTableTableManager
                 gameDayPlayersRefs = false,
                 gameScoresRefs = false,
                 chipSettlementsRefs = false,
+                yakumansRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -2905,6 +3340,7 @@ class $$PlayersTableTableManager
                     if (gameDayPlayersRefs) db.gameDayPlayers,
                     if (gameScoresRefs) db.gameScores,
                     if (chipSettlementsRefs) db.chipSettlements,
+                    if (yakumansRefs) db.yakumans,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -2972,6 +3408,27 @@ class $$PlayersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (yakumansRefs)
+                        await $_getPrefetchedData<
+                          Player,
+                          $PlayersTable,
+                          Yakuman
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PlayersTableReferences
+                              ._yakumansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PlayersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).yakumansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.playerId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -2996,6 +3453,7 @@ typedef $$PlayersTableProcessedTableManager =
         bool gameDayPlayersRefs,
         bool gameScoresRefs,
         bool chipSettlementsRefs,
+        bool yakumansRefs,
       })
     >;
 typedef $$GameDaysTableCreateCompanionBuilder =
@@ -3028,10 +3486,7 @@ final class $$GameDaysTableReferences
   static MultiTypedResultKey<$GameDayPlayersTable, List<GameDayPlayer>>
   _gameDayPlayersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.gameDayPlayers,
-    aliasName: $_aliasNameGenerator(
-      db.gameDays.id,
-      db.gameDayPlayers.gameDayId,
-    ),
+    aliasName: 'game_days__id__game_day_players__game_day_id',
   );
 
   $$GameDayPlayersTableProcessedTableManager get gameDayPlayersRefs {
@@ -3050,7 +3505,7 @@ final class $$GameDaysTableReferences
     _$AppDatabase db,
   ) => MultiTypedResultKey.fromTable(
     db.games,
-    aliasName: $_aliasNameGenerator(db.gameDays.id, db.games.gameDayId),
+    aliasName: 'game_days__id__games__game_day_id',
   );
 
   $$GamesTableProcessedTableManager get gamesRefs {
@@ -3068,7 +3523,7 @@ final class $$GameDaysTableReferences
   static MultiTypedResultKey<$ChipLoansTable, List<ChipLoan>>
   _chipLoansRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.chipLoans,
-    aliasName: $_aliasNameGenerator(db.gameDays.id, db.chipLoans.gameDayId),
+    aliasName: 'game_days__id__chip_loans__game_day_id',
   );
 
   $$ChipLoansTableProcessedTableManager get chipLoansRefs {
@@ -3086,10 +3541,7 @@ final class $$GameDaysTableReferences
   static MultiTypedResultKey<$ChipSettlementsTable, List<ChipSettlement>>
   _chipSettlementsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.chipSettlements,
-    aliasName: $_aliasNameGenerator(
-      db.gameDays.id,
-      db.chipSettlements.gameDayId,
-    ),
+    aliasName: 'game_days__id__chip_settlements__game_day_id',
   );
 
   $$ChipSettlementsTableProcessedTableManager get chipSettlementsRefs {
@@ -3517,7 +3969,7 @@ class $$GameDaysTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$GameDaysTable, GameDay>(table),
                   $$GameDaysTableReferences(db, table, e),
                 ),
               )
@@ -3673,9 +4125,7 @@ final class $$GameDayPlayersTableReferences
   );
 
   static $GameDaysTable _gameDayIdTable(_$AppDatabase db) =>
-      db.gameDays.createAlias(
-        $_aliasNameGenerator(db.gameDayPlayers.gameDayId, db.gameDays.id),
-      );
+      db.gameDays.createAlias('game_day_players__game_day_id__game_days__id');
 
   $$GameDaysTableProcessedTableManager get gameDayId {
     final $_column = $_itemColumn<int>('game_day_id')!;
@@ -3692,9 +4142,7 @@ final class $$GameDayPlayersTableReferences
   }
 
   static $PlayersTable _playerIdTable(_$AppDatabase db) =>
-      db.players.createAlias(
-        $_aliasNameGenerator(db.gameDayPlayers.playerId, db.players.id),
-      );
+      db.players.createAlias('game_day_players__player_id__players__id');
 
   $$PlayersTableProcessedTableManager get playerId {
     final $_column = $_itemColumn<int>('player_id')!;
@@ -3943,7 +4391,7 @@ class $$GameDayPlayersTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$GameDayPlayersTable, GameDayPlayer>(table),
                   $$GameDayPlayersTableReferences(db, table, e),
                 ),
               )
@@ -4041,8 +4489,8 @@ final class $$GamesTableReferences
     extends BaseReferences<_$AppDatabase, $GamesTable, Game> {
   $$GamesTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $GameDaysTable _gameDayIdTable(_$AppDatabase db) => db.gameDays
-      .createAlias($_aliasNameGenerator(db.games.gameDayId, db.gameDays.id));
+  static $GameDaysTable _gameDayIdTable(_$AppDatabase db) =>
+      db.gameDays.createAlias('games__game_day_id__game_days__id');
 
   $$GameDaysTableProcessedTableManager get gameDayId {
     final $_column = $_itemColumn<int>('game_day_id')!;
@@ -4061,7 +4509,7 @@ final class $$GamesTableReferences
   static MultiTypedResultKey<$GameScoresTable, List<GameScore>>
   _gameScoresRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.gameScores,
-    aliasName: $_aliasNameGenerator(db.games.id, db.gameScores.gameId),
+    aliasName: 'games__id__game_scores__game_id',
   );
 
   $$GameScoresTableProcessedTableManager get gameScoresRefs {
@@ -4071,6 +4519,25 @@ final class $$GamesTableReferences
     ).filter((f) => f.gameId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_gameScoresRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$YakumansTable, List<Yakuman>> _yakumansRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.yakumans,
+    aliasName: 'games__id__yakumans__game_id',
+  );
+
+  $$YakumansTableProcessedTableManager get yakumansRefs {
+    final manager = $$YakumansTableTableManager(
+      $_db,
+      $_db.yakumans,
+    ).filter((f) => f.gameId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_yakumansRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4139,6 +4606,31 @@ class $$GamesTableFilterComposer extends Composer<_$AppDatabase, $GamesTable> {
           }) => $$GameScoresTableFilterComposer(
             $db: $db,
             $table: $db.gameScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> yakumansRefs(
+    Expression<bool> Function($$YakumansTableFilterComposer f) f,
+  ) {
+    final $$YakumansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.yakumans,
+      getReferencedColumn: (t) => t.gameId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$YakumansTableFilterComposer(
+            $db: $db,
+            $table: $db.yakumans,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4264,6 +4756,31 @@ class $$GamesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> yakumansRefs<T extends Object>(
+    Expression<T> Function($$YakumansTableAnnotationComposer a) f,
+  ) {
+    final $$YakumansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.yakumans,
+      getReferencedColumn: (t) => t.gameId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$YakumansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.yakumans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$GamesTableTableManager
@@ -4279,7 +4796,11 @@ class $$GamesTableTableManager
           $$GamesTableUpdateCompanionBuilder,
           (Game, $$GamesTableReferences),
           Game,
-          PrefetchHooks Function({bool gameDayId, bool gameScoresRefs})
+          PrefetchHooks Function({
+            bool gameDayId,
+            bool gameScoresRefs,
+            bool yakumansRefs,
+          })
         > {
   $$GamesTableTableManager(_$AppDatabase db, $GamesTable table)
     : super(
@@ -4318,63 +4839,96 @@ class $$GamesTableTableManager
               ),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$GamesTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable<$GamesTable, Game>(table),
+                  $$GamesTableReferences(db, table, e),
+                ),
               )
               .toList(),
-          prefetchHooksCallback: ({gameDayId = false, gameScoresRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (gameScoresRefs) db.gameScores],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (gameDayId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.gameDayId,
-                                referencedTable: $$GamesTableReferences
-                                    ._gameDayIdTable(db),
-                                referencedColumn: $$GamesTableReferences
-                                    ._gameDayIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                gameDayId = false,
+                gameScoresRefs = false,
+                yakumansRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (gameScoresRefs) db.gameScores,
+                    if (yakumansRefs) db.yakumans,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (gameDayId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.gameDayId,
+                                    referencedTable: $$GamesTableReferences
+                                        ._gameDayIdTable(db),
+                                    referencedColumn: $$GamesTableReferences
+                                        ._gameDayIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (gameScoresRefs)
+                        await $_getPrefetchedData<Game, $GamesTable, GameScore>(
+                          currentTable: table,
+                          referencedTable: $$GamesTableReferences
+                              ._gameScoresRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$GamesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).gameScoresRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.gameId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (yakumansRefs)
+                        await $_getPrefetchedData<Game, $GamesTable, Yakuman>(
+                          currentTable: table,
+                          referencedTable: $$GamesTableReferences
+                              ._yakumansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$GamesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).yakumansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.gameId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (gameScoresRefs)
-                    await $_getPrefetchedData<Game, $GamesTable, GameScore>(
-                      currentTable: table,
-                      referencedTable: $$GamesTableReferences
-                          ._gameScoresRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$GamesTableReferences(db, table, p0).gameScoresRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.gameId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -4391,7 +4945,11 @@ typedef $$GamesTableProcessedTableManager =
       $$GamesTableUpdateCompanionBuilder,
       (Game, $$GamesTableReferences),
       Game,
-      PrefetchHooks Function({bool gameDayId, bool gameScoresRefs})
+      PrefetchHooks Function({
+        bool gameDayId,
+        bool gameScoresRefs,
+        bool yakumansRefs,
+      })
     >;
 typedef $$GameScoresTableCreateCompanionBuilder =
     GameScoresCompanion Function({
@@ -4412,9 +4970,8 @@ final class $$GameScoresTableReferences
     extends BaseReferences<_$AppDatabase, $GameScoresTable, GameScore> {
   $$GameScoresTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $GamesTable _gameIdTable(_$AppDatabase db) => db.games.createAlias(
-    $_aliasNameGenerator(db.gameScores.gameId, db.games.id),
-  );
+  static $GamesTable _gameIdTable(_$AppDatabase db) =>
+      db.games.createAlias('game_scores__game_id__games__id');
 
   $$GamesTableProcessedTableManager get gameId {
     final $_column = $_itemColumn<int>('game_id')!;
@@ -4430,8 +4987,8 @@ final class $$GameScoresTableReferences
     );
   }
 
-  static $PlayersTable _playerIdTable(_$AppDatabase db) => db.players
-      .createAlias($_aliasNameGenerator(db.gameScores.playerId, db.players.id));
+  static $PlayersTable _playerIdTable(_$AppDatabase db) =>
+      db.players.createAlias('game_scores__player_id__players__id');
 
   $$PlayersTableProcessedTableManager get playerId {
     final $_column = $_itemColumn<int>('player_id')!;
@@ -4695,7 +5252,7 @@ class $$GameScoresTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$GameScoresTable, GameScore>(table),
                   $$GameScoresTableReferences(db, table, e),
                 ),
               )
@@ -4796,9 +5353,7 @@ final class $$ChipLoansTableReferences
   $$ChipLoansTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $GameDaysTable _gameDayIdTable(_$AppDatabase db) =>
-      db.gameDays.createAlias(
-        $_aliasNameGenerator(db.chipLoans.gameDayId, db.gameDays.id),
-      );
+      db.gameDays.createAlias('chip_loans__game_day_id__game_days__id');
 
   $$GameDaysTableProcessedTableManager get gameDayId {
     final $_column = $_itemColumn<int>('game_day_id')!;
@@ -4814,8 +5369,8 @@ final class $$ChipLoansTableReferences
     );
   }
 
-  static $PlayersTable _lenderIdTable(_$AppDatabase db) => db.players
-      .createAlias($_aliasNameGenerator(db.chipLoans.lenderId, db.players.id));
+  static $PlayersTable _lenderIdTable(_$AppDatabase db) =>
+      db.players.createAlias('chip_loans__lender_id__players__id');
 
   $$PlayersTableProcessedTableManager get lenderId {
     final $_column = $_itemColumn<int>('lender_id')!;
@@ -4832,9 +5387,7 @@ final class $$ChipLoansTableReferences
   }
 
   static $PlayersTable _borrowerIdTable(_$AppDatabase db) =>
-      db.players.createAlias(
-        $_aliasNameGenerator(db.chipLoans.borrowerId, db.players.id),
-      );
+      db.players.createAlias('chip_loans__borrower_id__players__id');
 
   $$PlayersTableProcessedTableManager get borrowerId {
     final $_column = $_itemColumn<int>('borrower_id')!;
@@ -5192,7 +5745,7 @@ class $$ChipLoansTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ChipLoansTable, ChipLoan>(table),
                   $$ChipLoansTableReferences(db, table, e),
                 ),
               )
@@ -5308,9 +5861,7 @@ final class $$ChipSettlementsTableReferences
   );
 
   static $GameDaysTable _gameDayIdTable(_$AppDatabase db) =>
-      db.gameDays.createAlias(
-        $_aliasNameGenerator(db.chipSettlements.gameDayId, db.gameDays.id),
-      );
+      db.gameDays.createAlias('chip_settlements__game_day_id__game_days__id');
 
   $$GameDaysTableProcessedTableManager get gameDayId {
     final $_column = $_itemColumn<int>('game_day_id')!;
@@ -5327,9 +5878,7 @@ final class $$ChipSettlementsTableReferences
   }
 
   static $PlayersTable _playerIdTable(_$AppDatabase db) =>
-      db.players.createAlias(
-        $_aliasNameGenerator(db.chipSettlements.playerId, db.players.id),
-      );
+      db.players.createAlias('chip_settlements__player_id__players__id');
 
   $$PlayersTableProcessedTableManager get playerId {
     final $_column = $_itemColumn<int>('player_id')!;
@@ -5595,7 +6144,7 @@ class $$ChipSettlementsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ChipSettlementsTable, ChipSettlement>(table),
                   $$ChipSettlementsTableReferences(db, table, e),
                 ),
               )
@@ -5791,7 +6340,16 @@ class $$AppSettingsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$AppSettingsTable, AppSetting>(table),
+                  BaseReferences<_$AppDatabase, $AppSettingsTable, AppSetting>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -5815,6 +6373,405 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$YakumansTableCreateCompanionBuilder =
+    YakumansCompanion Function({
+      Value<int> id,
+      required int gameId,
+      required int playerId,
+      required String yakumanName,
+      Value<DateTime> createdAt,
+    });
+typedef $$YakumansTableUpdateCompanionBuilder =
+    YakumansCompanion Function({
+      Value<int> id,
+      Value<int> gameId,
+      Value<int> playerId,
+      Value<String> yakumanName,
+      Value<DateTime> createdAt,
+    });
+
+final class $$YakumansTableReferences
+    extends BaseReferences<_$AppDatabase, $YakumansTable, Yakuman> {
+  $$YakumansTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $GamesTable _gameIdTable(_$AppDatabase db) =>
+      db.games.createAlias('yakumans__game_id__games__id');
+
+  $$GamesTableProcessedTableManager get gameId {
+    final $_column = $_itemColumn<int>('game_id')!;
+
+    final manager = $$GamesTableTableManager(
+      $_db,
+      $_db.games,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_gameIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $PlayersTable _playerIdTable(_$AppDatabase db) =>
+      db.players.createAlias('yakumans__player_id__players__id');
+
+  $$PlayersTableProcessedTableManager get playerId {
+    final $_column = $_itemColumn<int>('player_id')!;
+
+    final manager = $$PlayersTableTableManager(
+      $_db,
+      $_db.players,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$YakumansTableFilterComposer
+    extends Composer<_$AppDatabase, $YakumansTable> {
+  $$YakumansTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get yakumanName => $composableBuilder(
+    column: $table.yakumanName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$GamesTableFilterComposer get gameId {
+    final $$GamesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.gameId,
+      referencedTable: $db.games,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GamesTableFilterComposer(
+            $db: $db,
+            $table: $db.games,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$PlayersTableFilterComposer get playerId {
+    final $$PlayersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableFilterComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$YakumansTableOrderingComposer
+    extends Composer<_$AppDatabase, $YakumansTable> {
+  $$YakumansTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get yakumanName => $composableBuilder(
+    column: $table.yakumanName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$GamesTableOrderingComposer get gameId {
+    final $$GamesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.gameId,
+      referencedTable: $db.games,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GamesTableOrderingComposer(
+            $db: $db,
+            $table: $db.games,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$PlayersTableOrderingComposer get playerId {
+    final $$PlayersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableOrderingComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$YakumansTableAnnotationComposer
+    extends Composer<_$AppDatabase, $YakumansTable> {
+  $$YakumansTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get yakumanName => $composableBuilder(
+    column: $table.yakumanName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$GamesTableAnnotationComposer get gameId {
+    final $$GamesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.gameId,
+      referencedTable: $db.games,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GamesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.games,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$PlayersTableAnnotationComposer get playerId {
+    final $$PlayersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.playerId,
+      referencedTable: $db.players,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PlayersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.players,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$YakumansTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $YakumansTable,
+          Yakuman,
+          $$YakumansTableFilterComposer,
+          $$YakumansTableOrderingComposer,
+          $$YakumansTableAnnotationComposer,
+          $$YakumansTableCreateCompanionBuilder,
+          $$YakumansTableUpdateCompanionBuilder,
+          (Yakuman, $$YakumansTableReferences),
+          Yakuman,
+          PrefetchHooks Function({bool gameId, bool playerId})
+        > {
+  $$YakumansTableTableManager(_$AppDatabase db, $YakumansTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$YakumansTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$YakumansTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$YakumansTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> gameId = const Value.absent(),
+                Value<int> playerId = const Value.absent(),
+                Value<String> yakumanName = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => YakumansCompanion(
+                id: id,
+                gameId: gameId,
+                playerId: playerId,
+                yakumanName: yakumanName,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int gameId,
+                required int playerId,
+                required String yakumanName,
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => YakumansCompanion.insert(
+                id: id,
+                gameId: gameId,
+                playerId: playerId,
+                yakumanName: yakumanName,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$YakumansTable, Yakuman>(table),
+                  $$YakumansTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({gameId = false, playerId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (gameId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.gameId,
+                                referencedTable: $$YakumansTableReferences
+                                    ._gameIdTable(db),
+                                referencedColumn: $$YakumansTableReferences
+                                    ._gameIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+                    if (playerId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.playerId,
+                                referencedTable: $$YakumansTableReferences
+                                    ._playerIdTable(db),
+                                referencedColumn: $$YakumansTableReferences
+                                    ._playerIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$YakumansTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $YakumansTable,
+      Yakuman,
+      $$YakumansTableFilterComposer,
+      $$YakumansTableOrderingComposer,
+      $$YakumansTableAnnotationComposer,
+      $$YakumansTableCreateCompanionBuilder,
+      $$YakumansTableUpdateCompanionBuilder,
+      (Yakuman, $$YakumansTableReferences),
+      Yakuman,
+      PrefetchHooks Function({bool gameId, bool playerId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5835,4 +6792,6 @@ class $AppDatabaseManager {
       $$ChipSettlementsTableTableManager(_db, _db.chipSettlements);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$YakumansTableTableManager get yakumans =>
+      $$YakumansTableTableManager(_db, _db.yakumans);
 }

@@ -33,7 +33,7 @@ class StatsScreen extends ConsumerWidget {
                   DataColumn(label: Text('対戦数')),
                   DataColumn(label: Text('半荘数')),
                   DataColumn(label: Text('スコア計')),
-                  DataColumn(label: Text('チップ計')),
+                  DataColumn(label: Text('チップ収支')),
                 ],
                 rows: stats.map((s) {
                   return DataRow(cells: [
