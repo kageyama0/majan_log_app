@@ -16,7 +16,7 @@ void main() {
       editor.dispose();
     });
 
-    test('席上 n-1 入力でゼロ和自動', () {
+    test('席上 n-1 入力後、空き席フォーカスでゼロ和自動', () {
       final editor = HanchanRowEditor(
         gameNumber: 1,
         playerIds: const [1, 2, 3, 4, 5],
@@ -26,12 +26,59 @@ void main() {
       editor.controllers[1]!.text = '30';
       editor.controllers[2]!.text = '10';
       editor.controllers[3]!.text = '-20';
-      editor.autoCalcLast(skipPlayerId: 3);
+      // 入力だけでは埋まらない
+      expect(editor.controllers[4]!.text, '');
+      expect(editor.tryAutoFillOnFocus(4), isTrue);
       expect(editor.controllers[4]!.text, '-20');
       final scores = editor.parsedScoresOrNull();
       expect(scores, isNotNull);
       expect(scores!.keys.toSet(), {1, 2, 3, 4});
       expect(scores.values.fold<int>(0, (a, b) => a + b), 0);
+      editor.dispose();
+    });
+
+    test('未入力が2席以上ならフォーカスでも埋めない', () {
+      final editor = HanchanRowEditor(
+        gameNumber: 1,
+        playerIds: const [1, 2, 3, 4],
+        seatCount: 4,
+      );
+      editor.controllers[1]!.text = '30';
+      editor.controllers[2]!.text = '10';
+      expect(editor.tryAutoFillOnFocus(4), isFalse);
+      expect(editor.controllers[4]!.text, '');
+      editor.dispose();
+    });
+
+    test('手動入力済みの最終席は上書きしない', () {
+      final editor = HanchanRowEditor(
+        gameNumber: 1,
+        playerIds: const [1, 2, 3, 4],
+        seatCount: 4,
+      );
+      editor.controllers[1]!.text = '30';
+      editor.controllers[2]!.text = '10';
+      editor.controllers[3]!.text = '-20';
+      editor.controllers[4]!.text = '99';
+      expect(editor.tryAutoFillOnFocus(4), isFalse);
+      expect(editor.controllers[4]!.text, '99');
+      editor.dispose();
+    });
+
+    test('自動記入済みなら再フォーカスで再計算', () {
+      final editor = HanchanRowEditor(
+        gameNumber: 1,
+        playerIds: const [1, 2, 3, 4],
+        seatCount: 4,
+      );
+      editor.controllers[1]!.text = '30';
+      editor.controllers[2]!.text = '10';
+      editor.controllers[3]!.text = '-20';
+      expect(editor.tryAutoFillOnFocus(4), isTrue);
+      expect(editor.controllers[4]!.text, '-20');
+      editor.controllers[1]!.text = '40';
+      expect(editor.tryAutoFillOnFocus(4), isTrue);
+      expect(editor.controllers[4]!.text, '-30');
       editor.dispose();
     });
 

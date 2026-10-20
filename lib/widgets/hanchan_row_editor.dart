@@ -21,6 +21,9 @@ class HanchanRowEditor {
   /// 最後に DB へ書いたスコア（変更検知用）
   Map<int, int>? lastPersisted;
 
+  /// 最終席の自動記入が走ったあと UI 更新・保存用（任意）
+  VoidCallback? onAutoFilled;
+
   HanchanRowEditor({
     required this.gameNumber,
     required this.playerIds,
@@ -50,6 +53,16 @@ class HanchanRowEditor {
             initialScores == null ? null : Map<int, int>.from(initialScores) {
     for (final id in sittingOutIds) {
       controllers[id]?.clear();
+    }
+    for (final id in playerIds) {
+      focusNodes[id]!.addListener(() => _handleFocusChange(id));
+    }
+  }
+
+  void _handleFocusChange(int playerId) {
+    if (!(focusNodes[playerId]?.hasFocus ?? false)) return;
+    if (tryAutoFillOnFocus(playerId)) {
+      onAutoFilled?.call();
     }
   }
 
@@ -145,41 +158,32 @@ class HanchanRowEditor {
     }
   }
 
-  /// 席上メンバーだけでゼロ和自動記入を試す。
-  void autoCalcLast({int? skipPlayerId}) {
+  /// フォーカスした席が「席上で唯一の未入力」ならゼロ和で埋める。
+  ///
+  /// 他席の入力中・確定時には呼ばない。最後の空きセルをタップ／フォーカスした
+  /// 瞬間だけ発火する想定。手動入力済みのセルは上書きしない。自動記入済みなら再計算する。
+  /// 記入したら `true`。
+  bool tryAutoFillOnFocus(int focusedPlayerId) {
+    if (isSittingOut(focusedPlayerId)) return false;
     final seated = seatedIds;
-    if (seated.isEmpty) return;
+    if (!seated.contains(focusedPlayerId)) return false;
 
     final texts = <int, String>{
       for (final id in seated) id: controllers[id]!.text,
     };
 
-    final autoId = autoFilledPlayerId;
-    int? focusedId;
-    for (final e in focusNodes.entries) {
-      if (e.value.hasFocus) {
-        focusedId = e.key;
-        break;
-      }
+    final focusedText = texts[focusedPlayerId]!.trim();
+    // 手動上書き済みなら触らない
+    if (focusedText.isNotEmpty && autoFilledPlayerId != focusedPlayerId) {
+      return false;
     }
-
-    if (autoId != null &&
-        seated.contains(autoId) &&
-        autoId != skipPlayerId &&
-        autoId != focusedId) {
-      final othersFilled = seated
-          .where((id) => id != autoId)
-          .every((id) => texts[id]!.trim().isNotEmpty);
-      if (othersFilled) {
-        texts[autoId] = '';
-      }
+    // 自動記入済みなら空として再計算
+    if (autoFilledPlayerId == focusedPlayerId) {
+      texts[focusedPlayerId] = '';
     }
 
     final result = computeBalancingScore(texts);
-    if (result == null) return;
-
-    final skip = skipPlayerId ?? focusedId;
-    if (result.playerId == skip) return;
+    if (result == null || result.playerId != focusedPlayerId) return false;
 
     final controller = controllers[result.playerId]!;
     final next = '${result.score}';
@@ -189,6 +193,7 @@ class HanchanRowEditor {
     }
     autoFilledPlayerId = result.playerId;
     dirty = true;
+    return true;
   }
 
   /// 席上メンバー全員分パースでき、休み人数も正しければスコア Map。

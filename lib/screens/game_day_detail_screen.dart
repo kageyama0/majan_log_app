@@ -541,6 +541,16 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             {bool bold, Color? color, Color? bg})
         cell,
   }) {
+    editor.onAutoFilled = () {
+      if (!mounted) return;
+      setState(() {});
+      _maybePersistSpreadsheetRow(
+        db: db,
+        editor: editor,
+        existing: existing,
+      );
+    };
+
     return TableRow(
       decoration: decoration,
       children: [
@@ -569,21 +579,12 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
             onLongPress: editor.hasSitOut ? null : onDelete,
             onChanged: (_) {
               editor.dirty = true;
+              // 自動記入セルを手動編集したら以降は上書きしない
               if (editor.autoFilledPlayerId == p.id) {
                 editor.autoFilledPlayerId = null;
               }
-              editor.autoCalcLast(skipPlayerId: p.id);
-              if (editor.parsedScoresOrNull() != null &&
-                  editor.autoFilledPlayerId != null) {
-                _maybePersistSpreadsheetRow(
-                  db: db,
-                  editor: editor,
-                  existing: existing,
-                );
-              }
             },
             onEditingComplete: () {
-              editor.autoCalcLast();
               editor.focusNextSeated(p.id);
               _maybePersistSpreadsheetRow(
                 db: db,
@@ -668,7 +669,6 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
     required HanchanRowEditor editor,
     required Game? existing,
   }) async {
-    editor.autoCalcLast();
     final scores = editor.parsedScoresOrNull();
     if (scores == null || editor.saving) return;
     if (editor.isUnchanged(scores)) return;
