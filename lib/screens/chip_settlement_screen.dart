@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
+import 'package:majan_log_app/utils/signed_int_input.dart';
+import 'package:majan_log_app/utils/venue_fee_split.dart';
 
 class ChipSettlementScreen extends ConsumerStatefulWidget {
   final int gameDayId;
@@ -115,12 +117,14 @@ class _ChipSettlementScreenState
     return balance;
   }
 
+  int _parseChipDiff(int playerId) =>
+      parseSignedInt(_controllers[playerId]?.text ?? '') ?? 0;
+
   Map<int, int> _calcChipNet() {
     final loanBalance = _calcLoanBalance();
     final net = <int, int>{};
     for (final p in _players) {
-      final chipDiff =
-          int.tryParse(_controllers[p.id]?.text.trim() ?? '') ?? 0;
+      final chipDiff = _parseChipDiff(p.id);
       final borrowed = loanBalance[p.id] ?? 0;
       net[p.id] = chipDiff - borrowed;
     }
@@ -131,35 +135,55 @@ class _ChipSettlementScreenState
   int _getVenueFeeTotal() =>
       int.tryParse(_venueFeeController.text.trim()) ?? 0;
 
-  /// 割る人数 = 対戦日の参加者（精算画面の対象者）全員。
-  int _venueFeeShareCount() => _players.length;
-
-  /// 1人あたり場代。全体額 ÷ 人数（端数は切り捨て）。
-  int _getVenueFeePerPerson() {
-    final total = _getVenueFeeTotal();
-    final count = _venueFeeShareCount();
-    if (total <= 0 || count <= 0) return 0;
-    return total ~/ count;
-  }
-
-  int _getVenueFeeRemainder() {
-    final total = _getVenueFeeTotal();
-    final count = _venueFeeShareCount();
-    if (total <= 0 || count <= 0) return 0;
-    return total % count;
-  }
-
-  Map<int, int> _calcTotalYen() {
+  /// 場代控除前の合計収支（順位点¥ + チップ¥）。
+  Map<int, int> _calcPreVenueBalanceYen() {
     final chipNet = _calcChipNet();
-    final total = <int, int>{};
     final gd = _gameDay!;
-    final venueFeePerPerson = _getVenueFeePerPerson();
+    final balance = <int, int>{};
     for (final p in _players) {
       final scoreYen = (_scoreTotals[p.id] ?? 0) * gd.scoreRate;
       final chipYen = (chipNet[p.id] ?? 0) * gd.chipRate;
-      total[p.id] = scoreYen + chipYen - venueFeePerPerson;
+      balance[p.id] = scoreYen + chipYen;
     }
-    return total;
+    return balance;
+  }
+
+  VenueFeeSplitResult _splitVenueFees() {
+    final ranked = rankPlayersForVenueFee(
+      playerIds: _players.map((p) => p.id),
+      preVenueBalanceYen: _calcPreVenueBalanceYen(),
+      scorePoints: _scoreTotals,
+    );
+    return splitVenueFee(
+      total: _getVenueFeeTotal(),
+      rankedPlayerIds: ranked,
+    );
+  }
+
+  Map<int, int> _calcTotalYen(Map<int, int> venueFees) {
+    final pre = _calcPreVenueBalanceYen();
+    return {
+      for (final p in _players)
+        p.id: (pre[p.id] ?? 0) - (venueFees[p.id] ?? 0),
+    };
+  }
+
+  String _venueFeeHelperText(VenueFeeSplitResult split) {
+    final total = _getVenueFeeTotal();
+    if (total <= 0 || _players.isEmpty) {
+      return '参加者全員で割ります（100円単位・余りは勝ち側）';
+    }
+    final nameOf = {for (final p in _players) p.id: p.name};
+    final ranked = rankPlayersForVenueFee(
+      playerIds: _players.map((p) => p.id),
+      preVenueBalanceYen: _calcPreVenueBalanceYen(),
+      scorePoints: _scoreTotals,
+    );
+    final parts = ranked
+        .map((id) => '${nameOf[id]}${split.feesByPlayerId[id]}')
+        .join('・');
+    final discard = split.discarded > 0 ? '・端数${split.discarded}切捨' : '';
+    return '$parts（${split.unit}円単位・余りは勝ち側$discard）';
   }
 
   List<String> _calcTransfers(Map<int, int> totalYen) {
@@ -212,11 +236,11 @@ class _ChipSettlementScreenState
 
     final gd = _gameDay!;
     final venueFeeTotal = _getVenueFeeTotal();
-    final venueFeePerPerson = _getVenueFeePerPerson();
-    final venueFeeRemainder = _getVenueFeeRemainder();
+    final venueFeeSplit = _splitVenueFees();
+    final venueFees = venueFeeSplit.feesByPlayerId;
     final loanBalance = _calcLoanBalance();
     final chipNet = _calcChipNet();
-    final totalYen = _calcTotalYen();
+    final totalYen = _calcTotalYen(venueFees);
     final transfers = _calcTransfers(totalYen);
 
     return Scaffold(
@@ -241,10 +265,9 @@ class _ChipSettlementScreenState
                 ),
                 keyboardType:
                     const TextInputType.numberWithOptions(
-                        signed: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                      RegExp(r'^-?\d*')),
+                        signed: true, decimal: false),
+                inputFormatters: const [
+                  SignedIntegerTextInputFormatter(),
                 ],
                 onChanged: (_) => setState(() {}),
               ),
@@ -256,13 +279,7 @@ class _ChipSettlementScreenState
             decoration: InputDecoration(
               labelText: '場代（全体）',
               border: const OutlineInputBorder(),
-              helperText: venueFeeTotal > 0 && _players.isNotEmpty
-                  ? (venueFeeRemainder > 0
-                      ? '1人あたり ${_formatYenDisplay(venueFeePerPerson)}'
-                          '（${_players.length}人割・端数$venueFeeRemainder切り捨て）'
-                      : '1人あたり ${_formatYenDisplay(venueFeePerPerson)}'
-                          '（${_players.length}人割）')
-                  : '参加者全員で割ります',
+              helperText: _venueFeeHelperText(venueFeeSplit),
             ),
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -295,7 +312,7 @@ class _ChipSettlementScreenState
                   const DataColumn(label: Text('名前')),
                   const DataColumn(label: Text('順位点')),
                   const DataColumn(label: Text('チップ')),
-                  if (venueFeePerPerson > 0)
+                  if (venueFeeTotal > 0)
                     const DataColumn(label: Text('場代')),
                   const DataColumn(label: Text('合計')),
                 ],
@@ -304,6 +321,7 @@ class _ChipSettlementScreenState
                   final scoreYen = scoreTotal * gd.scoreRate;
                   final chipNetVal = chipNet[p.id] ?? 0;
                   final chipYen = chipNetVal * gd.chipRate;
+                  final venueFee = venueFees[p.id] ?? 0;
                   final total = totalYen[p.id] ?? 0;
                   return DataRow(cells: [
                     DataCell(Text(p.name)),
@@ -323,9 +341,9 @@ class _ChipSettlementScreenState
                             : Colors.red,
                       ),
                     )),
-                    if (venueFeePerPerson > 0)
+                    if (venueFeeTotal > 0)
                       DataCell(Text(
-                        '-${_formatYenDisplay(venueFeePerPerson)}',
+                        '-${_formatYenDisplay(venueFee)}',
                         style: const TextStyle(color: Colors.red),
                       )),
                     DataCell(Text(
@@ -348,9 +366,7 @@ class _ChipSettlementScreenState
             ),
             const SizedBox(height: 4),
             ..._players.map((p) {
-              final chipDiff = int.tryParse(
-                      _controllers[p.id]?.text.trim() ?? '') ??
-                  0;
+              final chipDiff = _parseChipDiff(p.id);
               final borrowed = loanBalance[p.id] ?? 0;
               final net = chipNet[p.id] ?? 0;
               return Padding(
@@ -407,8 +423,7 @@ class _ChipSettlementScreenState
         .go();
 
     for (final p in _players) {
-      final chipDiff =
-          int.tryParse(_controllers[p.id]?.text.trim() ?? '') ?? 0;
+      final chipDiff = _parseChipDiff(p.id);
       await db.into(db.chipSettlements).insert(
             ChipSettlementsCompanion.insert(
               gameDayId: widget.gameDayId,
