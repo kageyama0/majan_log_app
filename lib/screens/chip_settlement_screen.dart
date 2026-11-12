@@ -235,7 +235,6 @@ class _ChipSettlementScreenState
             decoration: const InputDecoration(
               labelText: '場代（1人あたり）',
               border: OutlineInputBorder(),
-              suffixText: '円',
             ),
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -266,11 +265,11 @@ class _ChipSettlementScreenState
                 columnSpacing: 12,
                 columns: [
                   const DataColumn(label: Text('名前')),
-                  const DataColumn(label: Text('順位点¥')),
-                  const DataColumn(label: Text('チップ¥')),
+                  const DataColumn(label: Text('順位点')),
+                  const DataColumn(label: Text('チップ')),
                   if (venueFee > 0)
                     const DataColumn(label: Text('場代')),
-                  const DataColumn(label: Text('合計¥')),
+                  const DataColumn(label: Text('合計')),
                 ],
                 rows: _players.map((p) {
                   final scoreTotal = _scoreTotals[p.id] ?? 0;
@@ -361,10 +360,10 @@ class _ChipSettlementScreenState
     if (yen >= 10000) {
       final man = yen ~/ 10000;
       final rest = yen % 10000;
-      if (rest == 0) return '¥$man万';
-      return '¥$man万$rest';
+      if (rest == 0) return '$man万';
+      return '$man万$rest';
     }
-    return '¥$yen';
+    return '$yen';
   }
 
   Future<void> _save() async {
