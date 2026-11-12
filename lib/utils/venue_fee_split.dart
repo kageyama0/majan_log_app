@@ -3,10 +3,10 @@ class VenueFeeSplitResult {
   /// プレイヤー ID → 負担額（円）。合計は [allocatedTotal]。
   final Map<int, int> feesByPlayerId;
 
-  /// 使った単位（100 or 10）。
+  /// 非トップに使う単位（常に 100）。
   final int unit;
 
-  /// 10 円未満で配分できず切り捨てた端数（通常 0）。
+  /// 配分できず切り捨てた端数（現行アルゴリズムでは常に 0）。
   final int discarded;
 
   /// 実際に配分した合計（= total - discarded）。
@@ -27,8 +27,7 @@ class VenueFeeSplitResult {
 /// 2. 同点なら当日の順位点合計が高い順
 /// 3. それでも同点なら playerId 昇順（安定・決定的）
 ///
-/// 全員同点などで勝ちが決まらない場合も 3 により一意に並べ、
-/// 端数ユニットは並べた先頭から順に載せる。
+/// 全員同点などで勝ちが決まらない場合も 3 により一意に並べる。
 List<int> rankPlayersForVenueFee({
   required Iterable<int> playerIds,
   required Map<int, int> preVenueBalanceYen,
@@ -49,13 +48,11 @@ List<int> rankPlayersForVenueFee({
 
 /// 場代 [total] を [rankedPlayerIds]（勝ち順）で割る。
 ///
-/// - 基本は **100 円単位**（[total] が 100 の倍数のとき）
-/// - そうでなければ **10 円単位**
-/// - 1 円単位では割らない。10 円未満の端数は [VenueFeeSplitResult.discarded]
-/// - 各人の基本額を揃えたうえで、余った単位は勝ち側（リスト先頭）から順に +1 単位
+/// - **トップ以外**は **100 円単位**（切り捨て）
+/// - **余った金額はすべてトップ**が負担（1 円単位の端数も含む）
 ///
-/// 例: 全体 1000・3 人 → 単位 100・基本 300・余り 100
-/// → 1 位 400、他 300 ずつ。
+/// 例: 全体 1070・3 人 → 非トップ 300 ずつ・トップ 470。
+/// 例: 全体 1000・3 人 → 非トップ 300 ずつ・トップ 400。
 VenueFeeSplitResult splitVenueFee({
   required int total,
   required List<int> rankedPlayerIds,
@@ -69,30 +66,22 @@ VenueFeeSplitResult splitVenueFee({
     );
   }
 
-  late final int unit;
-  late final int allocatable;
-  if (total % 100 == 0) {
-    unit = 100;
-    allocatable = total;
-  } else {
-    unit = 10;
-    allocatable = (total ~/ 10) * 10;
-  }
-  final discarded = total - allocatable;
-
-  final chunks = allocatable ~/ unit;
-  final baseChunks = chunks ~/ n;
-  final extraChunks = chunks % n;
+  const unit = 100;
+  // 均等割の切り捨てを 100 円単位にした額が非トップの負担。
+  final nonTopFee = (total ~/ n ~/ unit) * unit;
 
   final fees = <int, int>{};
-  for (var i = 0; i < n; i++) {
-    final extra = i < extraChunks ? 1 : 0;
-    fees[rankedPlayerIds[i]] = (baseChunks + extra) * unit;
+  var othersTotal = 0;
+  for (var i = 1; i < n; i++) {
+    fees[rankedPlayerIds[i]] = nonTopFee;
+    othersTotal += nonTopFee;
   }
+  // 余り（100 円未満の端数 + 均等割の余り）はすべてトップへ。
+  fees[rankedPlayerIds[0]] = total - othersTotal;
 
   return VenueFeeSplitResult(
     feesByPlayerId: fees,
     unit: unit,
-    discarded: discarded,
+    discarded: 0,
   );
 }

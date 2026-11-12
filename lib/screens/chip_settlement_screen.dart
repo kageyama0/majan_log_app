@@ -211,7 +211,7 @@ class _ChipSettlementScreenState
   String _venueFeeHelperText(VenueFeeSplitResult split) {
     final total = _getVenueFeeTotal();
     if (total <= 0 || _players.isEmpty) {
-      return '参加者全員で割ります（100円単位・余りは勝ち側）';
+      return '参加者全員で割ります（トップ以外100円単位・余りはトップ）';
     }
     final nameOf = {for (final p in _players) p.id: p.name};
     final ranked = rankPlayersForVenueFee(
@@ -222,8 +222,7 @@ class _ChipSettlementScreenState
     final parts = ranked
         .map((id) => '${nameOf[id]}${split.feesByPlayerId[id]}')
         .join('・');
-    final discard = split.discarded > 0 ? '・端数${split.discarded}切捨' : '';
-    return '$parts（${split.unit}円単位・余りは勝ち側$discard）';
+    return '$parts（トップ以外100円単位・余りはトップ）';
   }
 
   List<String> _calcTransfers(Map<int, int> totalYen) {

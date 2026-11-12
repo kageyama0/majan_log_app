@@ -23,7 +23,7 @@ void main() {
   });
 
   group('splitVenueFee', () {
-    test('1000円・3人は100円単位で勝ち側へ余り', () {
+    test('1000円・3人は100円単位で余りはトップ', () {
       final result = splitVenueFee(
         total: 1000,
         rankedPlayerIds: [10, 20, 30],
@@ -36,39 +36,54 @@ void main() {
       expect(result.allocatedTotal, 1000);
     });
 
-    test('1050円は10円単位', () {
+    test('1070円・3人は非トップ300・トップ470', () {
+      final result = splitVenueFee(
+        total: 1070,
+        rankedPlayerIds: [10, 20, 30],
+      );
+      expect(result.unit, 100);
+      expect(result.discarded, 0);
+      expect(result.feesByPlayerId[10], 470);
+      expect(result.feesByPlayerId[20], 300);
+      expect(result.feesByPlayerId[30], 300);
+      expect(result.allocatedTotal, 1070);
+    });
+
+    test('1050円も非トップは100円単位・余りはトップ', () {
       final result = splitVenueFee(
         total: 1050,
         rankedPlayerIds: [1, 2, 3],
       );
-      expect(result.unit, 10);
-      expect(result.feesByPlayerId, {1: 350, 2: 350, 3: 350});
+      expect(result.unit, 100);
+      expect(result.discarded, 0);
+      expect(result.feesByPlayerId, {1: 450, 2: 300, 3: 300});
+      expect(result.allocatedTotal, 1050);
     });
 
-    test('余りユニットが複数なら上位から順に', () {
+    test('余りはすべてトップのみが負担', () {
       final result = splitVenueFee(
         total: 1000,
         rankedPlayerIds: [1, 2, 3, 4, 5, 6, 7],
       );
       expect(result.unit, 100);
-      // base 100、余り 300 → 上位3人が +100
-      expect(result.feesByPlayerId[1], 200);
-      expect(result.feesByPlayerId[2], 200);
-      expect(result.feesByPlayerId[3], 200);
+      // 非トップは各 100、余り 400 はトップのみ
+      expect(result.feesByPlayerId[1], 400);
+      expect(result.feesByPlayerId[2], 100);
+      expect(result.feesByPlayerId[3], 100);
       expect(result.feesByPlayerId[4], 100);
       expect(result.feesByPlayerId[7], 100);
       expect(result.allocatedTotal, 1000);
     });
 
-    test('10円未満は切り捨て', () {
+    test('100円未満の端数もトップが負担（切捨てなし）', () {
       final result = splitVenueFee(
         total: 1005,
         rankedPlayerIds: [1, 2],
       );
-      expect(result.unit, 10);
-      expect(result.discarded, 5);
-      expect(result.allocatedTotal, 1000);
-      expect(result.feesByPlayerId[1], 500);
+      expect(result.unit, 100);
+      expect(result.discarded, 0);
+      expect(result.allocatedTotal, 1005);
+      expect(result.feesByPlayerId[1], 505);
       expect(result.feesByPlayerId[2], 500);
     });
   });
