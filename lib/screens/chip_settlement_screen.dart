@@ -127,18 +127,37 @@ class _ChipSettlementScreenState
     return net;
   }
 
-  int _getVenueFee() =>
+  /// 場代の全体額（入力値）。DB にもこの全体額を保存する。
+  int _getVenueFeeTotal() =>
       int.tryParse(_venueFeeController.text.trim()) ?? 0;
+
+  /// 割る人数 = 対戦日の参加者（精算画面の対象者）全員。
+  int _venueFeeShareCount() => _players.length;
+
+  /// 1人あたり場代。全体額 ÷ 人数（端数は切り捨て）。
+  int _getVenueFeePerPerson() {
+    final total = _getVenueFeeTotal();
+    final count = _venueFeeShareCount();
+    if (total <= 0 || count <= 0) return 0;
+    return total ~/ count;
+  }
+
+  int _getVenueFeeRemainder() {
+    final total = _getVenueFeeTotal();
+    final count = _venueFeeShareCount();
+    if (total <= 0 || count <= 0) return 0;
+    return total % count;
+  }
 
   Map<int, int> _calcTotalYen() {
     final chipNet = _calcChipNet();
     final total = <int, int>{};
     final gd = _gameDay!;
-    final venueFee = _getVenueFee();
+    final venueFeePerPerson = _getVenueFeePerPerson();
     for (final p in _players) {
       final scoreYen = (_scoreTotals[p.id] ?? 0) * gd.scoreRate;
       final chipYen = (chipNet[p.id] ?? 0) * gd.chipRate;
-      total[p.id] = scoreYen + chipYen - venueFee;
+      total[p.id] = scoreYen + chipYen - venueFeePerPerson;
     }
     return total;
   }
@@ -192,7 +211,9 @@ class _ChipSettlementScreenState
     }
 
     final gd = _gameDay!;
-    final venueFee = _getVenueFee();
+    final venueFeeTotal = _getVenueFeeTotal();
+    final venueFeePerPerson = _getVenueFeePerPerson();
+    final venueFeeRemainder = _getVenueFeeRemainder();
     final loanBalance = _calcLoanBalance();
     final chipNet = _calcChipNet();
     final totalYen = _calcTotalYen();
@@ -232,9 +253,16 @@ class _ChipSettlementScreenState
           const SizedBox(height: 16),
           TextField(
             controller: _venueFeeController,
-            decoration: const InputDecoration(
-              labelText: '場代（1人あたり）',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: '場代（全体）',
+              border: const OutlineInputBorder(),
+              helperText: venueFeeTotal > 0 && _players.isNotEmpty
+                  ? (venueFeeRemainder > 0
+                      ? '1人あたり ${_formatYenDisplay(venueFeePerPerson)}'
+                          '（${_players.length}人割・端数$venueFeeRemainder切り捨て）'
+                      : '1人あたり ${_formatYenDisplay(venueFeePerPerson)}'
+                          '（${_players.length}人割）')
+                  : '参加者全員で割ります',
             ),
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -267,7 +295,7 @@ class _ChipSettlementScreenState
                   const DataColumn(label: Text('名前')),
                   const DataColumn(label: Text('順位点')),
                   const DataColumn(label: Text('チップ')),
-                  if (venueFee > 0)
+                  if (venueFeePerPerson > 0)
                     const DataColumn(label: Text('場代')),
                   const DataColumn(label: Text('合計')),
                 ],
@@ -295,9 +323,9 @@ class _ChipSettlementScreenState
                             : Colors.red,
                       ),
                     )),
-                    if (venueFee > 0)
+                    if (venueFeePerPerson > 0)
                       DataCell(Text(
-                        '-${_formatYenDisplay(venueFee)}',
+                        '-${_formatYenDisplay(venueFeePerPerson)}',
                         style: const TextStyle(color: Colors.red),
                       )),
                     DataCell(Text(
@@ -369,10 +397,10 @@ class _ChipSettlementScreenState
   Future<void> _save() async {
     final db = ref.read(databaseProvider);
 
-    final venueFee = _getVenueFee();
+    final venueFeeTotal = _getVenueFeeTotal();
     await (db.update(db.gameDays)
           ..where((t) => t.id.equals(widget.gameDayId)))
-        .write(GameDaysCompanion(venueFee: Value(venueFee)));
+        .write(GameDaysCompanion(venueFee: Value(venueFeeTotal)));
 
     await (db.delete(db.chipSettlements)
           ..where((t) => t.gameDayId.equals(widget.gameDayId)))
