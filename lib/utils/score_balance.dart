@@ -30,3 +30,32 @@
   }
   return (playerId: emptyPlayerId, score: -filledSum);
 }
+
+/// フォーカスした欄が「唯一の未入力」ならゼロ和で埋める値を返す。
+///
+/// 順位点・チップ差枚など、整数のゼロ和入力で共用。
+/// [autoFilledPlayerId] が focused と同じなら、その欄は空として再計算する。
+/// 手動入力済み（非空かつ autoFilled でない）は null。
+({int playerId, int value})? computeZeroSumAutoFillOnFocus({
+  required int focusedPlayerId,
+  required Map<int, String> textsByPlayerId,
+  int? autoFilledPlayerId,
+}) {
+  if (!textsByPlayerId.containsKey(focusedPlayerId)) return null;
+
+  final focusedText = textsByPlayerId[focusedPlayerId]!.trim();
+  // 手動上書き済みなら触らない
+  if (focusedText.isNotEmpty && autoFilledPlayerId != focusedPlayerId) {
+    return null;
+  }
+
+  final texts = Map<int, String>.from(textsByPlayerId);
+  // 自動記入済みなら空として再計算
+  if (autoFilledPlayerId == focusedPlayerId) {
+    texts[focusedPlayerId] = '';
+  }
+
+  final result = computeBalancingScore(texts);
+  if (result == null || result.playerId != focusedPlayerId) return null;
+  return (playerId: result.playerId, value: result.score);
+}

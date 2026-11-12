@@ -172,21 +172,15 @@ class HanchanRowEditor {
       for (final id in seated) id: controllers[id]!.text,
     };
 
-    final focusedText = texts[focusedPlayerId]!.trim();
-    // 手動上書き済みなら触らない
-    if (focusedText.isNotEmpty && autoFilledPlayerId != focusedPlayerId) {
-      return false;
-    }
-    // 自動記入済みなら空として再計算
-    if (autoFilledPlayerId == focusedPlayerId) {
-      texts[focusedPlayerId] = '';
-    }
-
-    final result = computeBalancingScore(texts);
-    if (result == null || result.playerId != focusedPlayerId) return false;
+    final result = computeZeroSumAutoFillOnFocus(
+      focusedPlayerId: focusedPlayerId,
+      textsByPlayerId: texts,
+      autoFilledPlayerId: autoFilledPlayerId,
+    );
+    if (result == null) return false;
 
     final controller = controllers[result.playerId]!;
-    final next = '${result.score}';
+    final next = '${result.value}';
     if (controller.text != next) {
       controller.text = next;
       controller.selection = TextSelection.collapsed(offset: next.length);

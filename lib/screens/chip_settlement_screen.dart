@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
+import 'package:majan_log_app/utils/score_balance.dart';
 import 'package:majan_log_app/utils/signed_int_input.dart';
 import 'package:majan_log_app/utils/venue_fee_split.dart';
 
@@ -24,7 +25,9 @@ class _ChipSettlementScreenState
   GameDay? _gameDay;
   Map<int, int> _scoreTotals = {};
   final Map<int, TextEditingController> _controllers = {};
+  final Map<int, FocusNode> _focusNodes = {};
   final _venueFeeController = TextEditingController();
+  int? _autoFilledPlayerId;
   bool _saved = false;
 
   @override
@@ -89,18 +92,55 @@ class _ChipSettlementScreenState
         _controllers[p.id] = TextEditingController(
           text: prev != null ? '${prev.chipDiff}' : '',
         );
+        final focus = FocusNode();
+        focus.addListener(() => _handleChipDiffFocus(p.id));
+        _focusNodes[p.id] = focus;
       }
+      _autoFilledPlayerId = null;
       _saved = existing.isNotEmpty;
     });
   }
 
   @override
   void dispose() {
+    for (final n in _focusNodes.values) {
+      n.dispose();
+    }
     for (final c in _controllers.values) {
       c.dispose();
     }
     _venueFeeController.dispose();
     super.dispose();
+  }
+
+  void _handleChipDiffFocus(int playerId) {
+    if (!(_focusNodes[playerId]?.hasFocus ?? false)) return;
+    if (_tryAutoFillChipDiffOnFocus(playerId)) {
+      setState(() {});
+    }
+  }
+
+  /// フォーカスした欄が「唯一の未入力」ならゼロ和で埋める（順位点と同じ）。
+  bool _tryAutoFillChipDiffOnFocus(int focusedPlayerId) {
+    final texts = <int, String>{
+      for (final p in _players) p.id: _controllers[p.id]?.text ?? '',
+    };
+    final result = computeZeroSumAutoFillOnFocus(
+      focusedPlayerId: focusedPlayerId,
+      textsByPlayerId: texts,
+      autoFilledPlayerId: _autoFilledPlayerId,
+    );
+    if (result == null) return false;
+
+    final controller = _controllers[result.playerId]!;
+    final next = '${result.value}';
+    if (controller.text != next) {
+      controller.text = next;
+      controller.selection =
+          TextSelection.collapsed(offset: next.length);
+    }
+    _autoFilledPlayerId = result.playerId;
+    return true;
   }
 
   Map<int, int> _calcLoanBalance() {
@@ -258,6 +298,7 @@ class _ChipSettlementScreenState
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: TextField(
                 controller: _controllers[p.id],
+                focusNode: _focusNodes[p.id],
                 decoration: InputDecoration(
                   labelText: p.name,
                   border: const OutlineInputBorder(),
