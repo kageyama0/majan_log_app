@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/utils/score_balance.dart';
+import 'package:majan_log_app/utils/settlement_transfers.dart';
 import 'package:majan_log_app/utils/signed_int_input.dart';
 import 'package:majan_log_app/utils/venue_fee_split.dart';
 
@@ -227,41 +228,14 @@ class _ChipSettlementScreenState
 
   List<String> _calcTransfers(Map<int, int> totalYen) {
     final playerName = {for (final p in _players) p.id: p.name};
-    final remaining = {
-      for (final e in totalYen.entries) e.key: e.value
-    };
-    final transfers = <String>[];
-
-    final debtors = totalYen.entries
-        .where((e) => e.value < 0)
-        .toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
-    final creditors = totalYen.entries
-        .where((e) => e.value > 0)
-        .toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    int i = 0, j = 0;
-    while (i < debtors.length && j < creditors.length) {
-      final debtorId = debtors[i].key;
-      final creditorId = creditors[j].key;
-      final debtAmt = -remaining[debtorId]!;
-      final creditAmt = remaining[creditorId]!;
-      final transfer = debtAmt < creditAmt ? debtAmt : creditAmt;
-
-      if (transfer > 0) {
-        transfers.add(
-            '${playerName[debtorId]} → ${playerName[creditorId]}: ${_formatYenDisplay(transfer)}');
-      }
-
-      remaining[debtorId] = remaining[debtorId]! + transfer;
-      remaining[creditorId] = remaining[creditorId]! - transfer;
-
-      if (remaining[debtorId] == 0) i++;
-      if (remaining[creditorId] == 0) j++;
-    }
-
-    return transfers;
+    final transfers = calcSettlementTransfers(
+      balances: totalYen,
+      playerNames: playerName,
+    );
+    return [
+      for (final t in transfers)
+        '${t.fromName} → ${t.toName}: ${_formatYenDisplay(t.amount)}',
+    ];
   }
 
   @override
