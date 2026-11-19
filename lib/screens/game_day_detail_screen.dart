@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/screens/chip_settlement_screen.dart';
+import 'package:majan_log_app/utils/score_rate_mode.dart';
 import 'package:majan_log_app/utils/sit_out_rotation.dart';
 import 'package:majan_log_app/widgets/hanchan_row_editor.dart';
 import 'package:majan_log_app/widgets/yakuman_section.dart';
@@ -435,7 +436,12 @@ class _ScoreTabState extends ConsumerState<_ScoreTab> {
                   cell('円', bold: true),
                   ...players.map((p) {
                     final total = totals[p.id] ?? 0;
-                    final yen = total * gameDay.scoreRate;
+                    final yen = ScoreRateMode.scoreToYen(
+                      scorePoints: total,
+                      scoreRate: gameDay.scoreRate,
+                      chipRate: gameDay.chipRate,
+                      mode: gameDay.scoreRateMode,
+                    );
                     return cell(
                       '${yen >= 0 ? "+" : ""}${_formatYen(yen)}',
                       bold: true,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
+import 'package:majan_log_app/utils/score_rate_mode.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -14,6 +15,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _scoreRateController = TextEditingController();
   final _chipRateController = TextEditingController();
+  int _scoreRateMode = ScoreRateMode.yen;
   bool _loaded = false;
 
   @override
@@ -26,9 +28,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final db = ref.read(databaseProvider);
     final scoreRate = await db.getSetting('defaultScoreRate', 50);
     final chipRate = await db.getSetting('defaultChipRate', 100);
+    final scoreRateMode =
+        await db.getSetting('defaultScoreRateMode', ScoreRateMode.yen);
     _scoreRateController.text = '$scoreRate';
     _chipRateController.text = '$chipRate';
-    setState(() => _loaded = true);
+    setState(() {
+      _scoreRateMode = scoreRateMode == ScoreRateMode.chip
+          ? ScoreRateMode.chip
+          : ScoreRateMode.yen;
+      _loaded = true;
+    });
   }
 
   @override
@@ -59,13 +68,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Text('新しい対戦日を作成するときの初期値です',
               style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 16),
+          const Text('順位点の換算',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(
+                value: ScoreRateMode.yen,
+                label: Text('円換算'),
+              ),
+              ButtonSegment(
+                value: ScoreRateMode.chip,
+                label: Text('チップ換算'),
+              ),
+            ],
+            selected: {_scoreRateMode},
+            onSelectionChanged: (value) {
+              setState(() => _scoreRateMode = value.first);
+            },
+          ),
+          const SizedBox(height: 16),
           TextField(
             controller: _scoreRateController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: '順位点レート',
-              border: OutlineInputBorder(),
-              suffixText: '円 / 1点',
-              helperText: '例: テンゴ=50、テンピン=100',
+              border: const OutlineInputBorder(),
+              suffixText: ScoreRateMode.scoreRateSuffix(_scoreRateMode),
+              helperText: ScoreRateMode.scoreRateHelper(_scoreRateMode),
             ),
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -104,6 +133,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         int.tryParse(_chipRateController.text) ?? 100;
     await db.setSetting('defaultScoreRate', scoreRate);
     await db.setSetting('defaultChipRate', chipRate);
+    await db.setSetting('defaultScoreRateMode', _scoreRateMode);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('保存しました')),

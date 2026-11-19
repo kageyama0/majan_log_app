@@ -19,6 +19,8 @@ class GameDays extends Table {
   DateTimeColumn get date => dateTime()();
   IntColumn get playerCount => integer().withDefault(const Constant(4))();
   IntColumn get scoreRate => integer().withDefault(const Constant(50))();
+  /// 0=円換算（従来）, 1=チップ換算。既存行は migration 既定 0。
+  IntColumn get scoreRateMode => integer().withDefault(const Constant(0))();
   IntColumn get chipRate => integer().withDefault(const Constant(100))();
   IntColumn get venueFee => integer().withDefault(const Constant(0))();
   TextColumn get memo => text().nullable()();
@@ -110,7 +112,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -125,6 +127,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await migrator.createTable(yakumans);
+          }
+          if (from < 5) {
+            await migrator.addColumn(gameDays, gameDays.scoreRateMode);
           }
         },
       );
@@ -213,6 +218,7 @@ class AppDatabase extends _$AppDatabase {
     // デフォルトレート設定
     await setSetting('defaultScoreRate', 50);
     await setSetting('defaultChipRate', 100);
+    await setSetting('defaultScoreRateMode', 0);
 
     // --- 対戦日1: 四麻 (7/20) テンゴ ---
     final gd1 = await into(gameDays).insert(

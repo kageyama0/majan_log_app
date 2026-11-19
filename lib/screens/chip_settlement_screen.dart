@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/utils/score_balance.dart';
+import 'package:majan_log_app/utils/score_rate_mode.dart';
 import 'package:majan_log_app/utils/settlement_transfers.dart';
 import 'package:majan_log_app/utils/signed_int_input.dart';
 import 'package:majan_log_app/utils/venue_fee_split.dart';
@@ -177,12 +178,18 @@ class _ChipSettlementScreenState
       int.tryParse(_venueFeeController.text.trim()) ?? 0;
 
   /// 場代控除前の合計収支（順位点¥ + チップ¥）。
+  /// 順位点は [GameDay.scoreRateMode] に従い円 or チップ経由で円換算。
   Map<int, int> _calcPreVenueBalanceYen() {
     final chipNet = _calcChipNet();
     final gd = _gameDay!;
     final balance = <int, int>{};
     for (final p in _players) {
-      final scoreYen = (_scoreTotals[p.id] ?? 0) * gd.scoreRate;
+      final scoreYen = ScoreRateMode.scoreToYen(
+        scorePoints: _scoreTotals[p.id] ?? 0,
+        scoreRate: gd.scoreRate,
+        chipRate: gd.chipRate,
+        mode: gd.scoreRateMode,
+      );
       final chipYen = (chipNet[p.id] ?? 0) * gd.chipRate;
       balance[p.id] = scoreYen + chipYen;
     }
@@ -317,6 +324,16 @@ class _ChipSettlementScreenState
               '収支内訳',
               style: Theme.of(context).textTheme.titleMedium,
             ),
+            if (ScoreRateMode.isChip(gd.scoreRateMode)) ...[
+              const SizedBox(height: 4),
+              Text(
+                '順位点はチップ換算（${gd.scoreRate}枚/点 × ${gd.chipRate}円/枚）',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -332,7 +349,12 @@ class _ChipSettlementScreenState
                 ],
                 rows: _players.map((p) {
                   final scoreTotal = _scoreTotals[p.id] ?? 0;
-                  final scoreYen = scoreTotal * gd.scoreRate;
+                  final scoreYen = ScoreRateMode.scoreToYen(
+                    scorePoints: scoreTotal,
+                    scoreRate: gd.scoreRate,
+                    chipRate: gd.chipRate,
+                    mode: gd.scoreRateMode,
+                  );
                   final chipNetVal = chipNet[p.id] ?? 0;
                   final chipYen = chipNetVal * gd.chipRate;
                   final venueFee = venueFees[p.id] ?? 0;

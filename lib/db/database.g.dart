@@ -299,6 +299,18 @@ class $GameDaysTable extends GameDays with TableInfo<$GameDaysTable, GameDay> {
     requiredDuringInsert: false,
     defaultValue: const Constant(50),
   );
+  static const VerificationMeta _scoreRateModeMeta = const VerificationMeta(
+    'scoreRateMode',
+  );
+  @override
+  late final GeneratedColumn<int> scoreRateMode = GeneratedColumn<int>(
+    'score_rate_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _chipRateMeta = const VerificationMeta(
     'chipRate',
   );
@@ -350,6 +362,7 @@ class $GameDaysTable extends GameDays with TableInfo<$GameDaysTable, GameDay> {
     date,
     playerCount,
     scoreRate,
+    scoreRateMode,
     chipRate,
     venueFee,
     memo,
@@ -391,6 +404,15 @@ class $GameDaysTable extends GameDays with TableInfo<$GameDaysTable, GameDay> {
       context.handle(
         _scoreRateMeta,
         scoreRate.isAcceptableOrUnknown(data['score_rate']!, _scoreRateMeta),
+      );
+    }
+    if (data.containsKey('score_rate_mode')) {
+      context.handle(
+        _scoreRateModeMeta,
+        scoreRateMode.isAcceptableOrUnknown(
+          data['score_rate_mode']!,
+          _scoreRateModeMeta,
+        ),
       );
     }
     if (data.containsKey('chip_rate')) {
@@ -442,6 +464,10 @@ class $GameDaysTable extends GameDays with TableInfo<$GameDaysTable, GameDay> {
         DriftSqlType.int,
         data['${effectivePrefix}score_rate'],
       )!,
+      scoreRateMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}score_rate_mode'],
+      )!,
       chipRate: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}chip_rate'],
@@ -472,6 +498,9 @@ class GameDay extends DataClass implements Insertable<GameDay> {
   final DateTime date;
   final int playerCount;
   final int scoreRate;
+
+  /// 0=円換算（従来）, 1=チップ換算。既存行は migration 既定 0。
+  final int scoreRateMode;
   final int chipRate;
   final int venueFee;
   final String? memo;
@@ -481,6 +510,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
     required this.date,
     required this.playerCount,
     required this.scoreRate,
+    required this.scoreRateMode,
     required this.chipRate,
     required this.venueFee,
     this.memo,
@@ -493,6 +523,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
     map['date'] = Variable<DateTime>(date);
     map['player_count'] = Variable<int>(playerCount);
     map['score_rate'] = Variable<int>(scoreRate);
+    map['score_rate_mode'] = Variable<int>(scoreRateMode);
     map['chip_rate'] = Variable<int>(chipRate);
     map['venue_fee'] = Variable<int>(venueFee);
     if (!nullToAbsent || memo != null) {
@@ -508,6 +539,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
       date: Value(date),
       playerCount: Value(playerCount),
       scoreRate: Value(scoreRate),
+      scoreRateMode: Value(scoreRateMode),
       chipRate: Value(chipRate),
       venueFee: Value(venueFee),
       memo: memo == null && nullToAbsent ? const Value.absent() : Value(memo),
@@ -525,6 +557,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
       date: serializer.fromJson<DateTime>(json['date']),
       playerCount: serializer.fromJson<int>(json['playerCount']),
       scoreRate: serializer.fromJson<int>(json['scoreRate']),
+      scoreRateMode: serializer.fromJson<int>(json['scoreRateMode']),
       chipRate: serializer.fromJson<int>(json['chipRate']),
       venueFee: serializer.fromJson<int>(json['venueFee']),
       memo: serializer.fromJson<String?>(json['memo']),
@@ -539,6 +572,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
       'date': serializer.toJson<DateTime>(date),
       'playerCount': serializer.toJson<int>(playerCount),
       'scoreRate': serializer.toJson<int>(scoreRate),
+      'scoreRateMode': serializer.toJson<int>(scoreRateMode),
       'chipRate': serializer.toJson<int>(chipRate),
       'venueFee': serializer.toJson<int>(venueFee),
       'memo': serializer.toJson<String?>(memo),
@@ -551,6 +585,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
     DateTime? date,
     int? playerCount,
     int? scoreRate,
+    int? scoreRateMode,
     int? chipRate,
     int? venueFee,
     Value<String?> memo = const Value.absent(),
@@ -560,6 +595,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
     date: date ?? this.date,
     playerCount: playerCount ?? this.playerCount,
     scoreRate: scoreRate ?? this.scoreRate,
+    scoreRateMode: scoreRateMode ?? this.scoreRateMode,
     chipRate: chipRate ?? this.chipRate,
     venueFee: venueFee ?? this.venueFee,
     memo: memo.present ? memo.value : this.memo,
@@ -573,6 +609,9 @@ class GameDay extends DataClass implements Insertable<GameDay> {
           ? data.playerCount.value
           : this.playerCount,
       scoreRate: data.scoreRate.present ? data.scoreRate.value : this.scoreRate,
+      scoreRateMode: data.scoreRateMode.present
+          ? data.scoreRateMode.value
+          : this.scoreRateMode,
       chipRate: data.chipRate.present ? data.chipRate.value : this.chipRate,
       venueFee: data.venueFee.present ? data.venueFee.value : this.venueFee,
       memo: data.memo.present ? data.memo.value : this.memo,
@@ -587,6 +626,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
           ..write('date: $date, ')
           ..write('playerCount: $playerCount, ')
           ..write('scoreRate: $scoreRate, ')
+          ..write('scoreRateMode: $scoreRateMode, ')
           ..write('chipRate: $chipRate, ')
           ..write('venueFee: $venueFee, ')
           ..write('memo: $memo, ')
@@ -601,6 +641,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
     date,
     playerCount,
     scoreRate,
+    scoreRateMode,
     chipRate,
     venueFee,
     memo,
@@ -614,6 +655,7 @@ class GameDay extends DataClass implements Insertable<GameDay> {
           other.date == this.date &&
           other.playerCount == this.playerCount &&
           other.scoreRate == this.scoreRate &&
+          other.scoreRateMode == this.scoreRateMode &&
           other.chipRate == this.chipRate &&
           other.venueFee == this.venueFee &&
           other.memo == this.memo &&
@@ -625,6 +667,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
   final Value<DateTime> date;
   final Value<int> playerCount;
   final Value<int> scoreRate;
+  final Value<int> scoreRateMode;
   final Value<int> chipRate;
   final Value<int> venueFee;
   final Value<String?> memo;
@@ -634,6 +677,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
     this.date = const Value.absent(),
     this.playerCount = const Value.absent(),
     this.scoreRate = const Value.absent(),
+    this.scoreRateMode = const Value.absent(),
     this.chipRate = const Value.absent(),
     this.venueFee = const Value.absent(),
     this.memo = const Value.absent(),
@@ -644,6 +688,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
     required DateTime date,
     this.playerCount = const Value.absent(),
     this.scoreRate = const Value.absent(),
+    this.scoreRateMode = const Value.absent(),
     this.chipRate = const Value.absent(),
     this.venueFee = const Value.absent(),
     this.memo = const Value.absent(),
@@ -654,6 +699,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
     Expression<DateTime>? date,
     Expression<int>? playerCount,
     Expression<int>? scoreRate,
+    Expression<int>? scoreRateMode,
     Expression<int>? chipRate,
     Expression<int>? venueFee,
     Expression<String>? memo,
@@ -664,6 +710,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
       if (date != null) 'date': date,
       if (playerCount != null) 'player_count': playerCount,
       if (scoreRate != null) 'score_rate': scoreRate,
+      if (scoreRateMode != null) 'score_rate_mode': scoreRateMode,
       if (chipRate != null) 'chip_rate': chipRate,
       if (venueFee != null) 'venue_fee': venueFee,
       if (memo != null) 'memo': memo,
@@ -676,6 +723,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
     Value<DateTime>? date,
     Value<int>? playerCount,
     Value<int>? scoreRate,
+    Value<int>? scoreRateMode,
     Value<int>? chipRate,
     Value<int>? venueFee,
     Value<String?>? memo,
@@ -686,6 +734,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
       date: date ?? this.date,
       playerCount: playerCount ?? this.playerCount,
       scoreRate: scoreRate ?? this.scoreRate,
+      scoreRateMode: scoreRateMode ?? this.scoreRateMode,
       chipRate: chipRate ?? this.chipRate,
       venueFee: venueFee ?? this.venueFee,
       memo: memo ?? this.memo,
@@ -707,6 +756,9 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
     }
     if (scoreRate.present) {
       map['score_rate'] = Variable<int>(scoreRate.value);
+    }
+    if (scoreRateMode.present) {
+      map['score_rate_mode'] = Variable<int>(scoreRateMode.value);
     }
     if (chipRate.present) {
       map['chip_rate'] = Variable<int>(chipRate.value);
@@ -730,6 +782,7 @@ class GameDaysCompanion extends UpdateCompanion<GameDay> {
           ..write('date: $date, ')
           ..write('playerCount: $playerCount, ')
           ..write('scoreRate: $scoreRate, ')
+          ..write('scoreRateMode: $scoreRateMode, ')
           ..write('chipRate: $chipRate, ')
           ..write('venueFee: $venueFee, ')
           ..write('memo: $memo, ')
@@ -3462,6 +3515,7 @@ typedef $$GameDaysTableCreateCompanionBuilder =
       required DateTime date,
       Value<int> playerCount,
       Value<int> scoreRate,
+      Value<int> scoreRateMode,
       Value<int> chipRate,
       Value<int> venueFee,
       Value<String?> memo,
@@ -3473,6 +3527,7 @@ typedef $$GameDaysTableUpdateCompanionBuilder =
       Value<DateTime> date,
       Value<int> playerCount,
       Value<int> scoreRate,
+      Value<int> scoreRateMode,
       Value<int> chipRate,
       Value<int> venueFee,
       Value<String?> memo,
@@ -3585,6 +3640,11 @@ class $$GameDaysTableFilterComposer
 
   ColumnFilters<int> get scoreRate => $composableBuilder(
     column: $table.scoreRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scoreRateMode => $composableBuilder(
+    column: $table.scoreRateMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3738,6 +3798,11 @@ class $$GameDaysTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get scoreRateMode => $composableBuilder(
+    column: $table.scoreRateMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get chipRate => $composableBuilder(
     column: $table.chipRate,
     builder: (column) => ColumnOrderings(column),
@@ -3781,6 +3846,11 @@ class $$GameDaysTableAnnotationComposer
 
   GeneratedColumn<int> get scoreRate =>
       $composableBuilder(column: $table.scoreRate, builder: (column) => column);
+
+  GeneratedColumn<int> get scoreRateMode => $composableBuilder(
+    column: $table.scoreRateMode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get chipRate =>
       $composableBuilder(column: $table.chipRate, builder: (column) => column);
@@ -3932,6 +4002,7 @@ class $$GameDaysTableTableManager
                 Value<DateTime> date = const Value.absent(),
                 Value<int> playerCount = const Value.absent(),
                 Value<int> scoreRate = const Value.absent(),
+                Value<int> scoreRateMode = const Value.absent(),
                 Value<int> chipRate = const Value.absent(),
                 Value<int> venueFee = const Value.absent(),
                 Value<String?> memo = const Value.absent(),
@@ -3941,6 +4012,7 @@ class $$GameDaysTableTableManager
                 date: date,
                 playerCount: playerCount,
                 scoreRate: scoreRate,
+                scoreRateMode: scoreRateMode,
                 chipRate: chipRate,
                 venueFee: venueFee,
                 memo: memo,
@@ -3952,6 +4024,7 @@ class $$GameDaysTableTableManager
                 required DateTime date,
                 Value<int> playerCount = const Value.absent(),
                 Value<int> scoreRate = const Value.absent(),
+                Value<int> scoreRateMode = const Value.absent(),
                 Value<int> chipRate = const Value.absent(),
                 Value<int> venueFee = const Value.absent(),
                 Value<String?> memo = const Value.absent(),
@@ -3961,6 +4034,7 @@ class $$GameDaysTableTableManager
                 date: date,
                 playerCount: playerCount,
                 scoreRate: scoreRate,
+                scoreRateMode: scoreRateMode,
                 chipRate: chipRate,
                 venueFee: venueFee,
                 memo: memo,

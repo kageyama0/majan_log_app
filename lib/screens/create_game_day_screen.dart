@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:majan_log_app/db/database.dart';
 import 'package:majan_log_app/providers/database_provider.dart';
 import 'package:majan_log_app/screens/game_day_detail_screen.dart';
+import 'package:majan_log_app/utils/score_rate_mode.dart';
 
 class CreateGameDayScreen extends ConsumerStatefulWidget {
   const CreateGameDayScreen({super.key});
@@ -22,6 +23,7 @@ class _CreateGameDayScreenState
   DateTime _date = DateTime.now();
   final _scoreRateController = TextEditingController();
   final _chipRateController = TextEditingController();
+  int _scoreRateMode = ScoreRateMode.yen;
   bool _loaded = false;
 
   /// 席数+余剰人数まで選択可（例: 四麻+1=5人、三麻+1=4人）。
@@ -43,9 +45,16 @@ class _CreateGameDayScreenState
     final db = ref.read(databaseProvider);
     final scoreRate = await db.getSetting('defaultScoreRate', 50);
     final chipRate = await db.getSetting('defaultChipRate', 100);
+    final scoreRateMode =
+        await db.getSetting('defaultScoreRateMode', ScoreRateMode.yen);
     _scoreRateController.text = '$scoreRate';
     _chipRateController.text = '$chipRate';
-    setState(() => _loaded = true);
+    setState(() {
+      _scoreRateMode = scoreRateMode == ScoreRateMode.chip
+          ? ScoreRateMode.chip
+          : ScoreRateMode.yen;
+      _loaded = true;
+    });
   }
 
   @override
@@ -131,15 +140,35 @@ class _CreateGameDayScreenState
             const Text('レート',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+            SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(
+                  value: ScoreRateMode.yen,
+                  label: Text('円換算'),
+                ),
+                ButtonSegment(
+                  value: ScoreRateMode.chip,
+                  label: Text('チップ換算'),
+                ),
+              ],
+              selected: {_scoreRateMode},
+              onSelectionChanged: (value) {
+                setState(() => _scoreRateMode = value.first);
+              },
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _scoreRateController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: '順位点',
-                      border: OutlineInputBorder(),
-                      suffixText: '円/点',
+                      border: const OutlineInputBorder(),
+                      suffixText:
+                          ScoreRateMode.scoreRateSuffix(_scoreRateMode),
+                      helperText:
+                          ScoreRateMode.scoreRateHelper(_scoreRateMode),
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [
@@ -229,6 +258,7 @@ class _CreateGameDayScreenState
             date: _date,
             playerCount: Value(_seatCount),
             scoreRate: Value(scoreRate),
+            scoreRateMode: Value(_scoreRateMode),
             chipRate: Value(chipRate),
           ),
         );

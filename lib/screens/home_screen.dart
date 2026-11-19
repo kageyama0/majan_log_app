@@ -7,6 +7,8 @@ import 'package:majan_log_app/screens/game_day_detail_screen.dart';
 import 'package:majan_log_app/screens/player_list_screen.dart';
 import 'package:majan_log_app/screens/create_game_day_screen.dart';
 import 'package:majan_log_app/screens/settings_screen.dart';
+import 'package:majan_log_app/utils/score_rate_mode.dart';
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -81,8 +83,11 @@ class HomeScreen extends ConsumerWidget {
                       (n != null && n > gd.playerCount)
                           ? '・$n人'
                           : '';
-                  final rateStr =
-                      '点${gd.scoreRate}円 / チップ${gd.chipRate}円';
+                  final rateStr = ScoreRateMode.homeRateLabel(
+                    scoreRate: gd.scoreRate,
+                    chipRate: gd.chipRate,
+                    mode: gd.scoreRateMode,
+                  );
                   return ListTile(
                     title:
                         Text('$dateStr ($typeStr$peopleSuffix)'),
