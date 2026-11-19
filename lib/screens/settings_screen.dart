@@ -94,7 +94,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               labelText: '順位点レート',
               border: const OutlineInputBorder(),
               suffixText: ScoreRateMode.scoreRateSuffix(_scoreRateMode),
-              helperText: ScoreRateMode.scoreRateHelper(_scoreRateMode),
             ),
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -108,7 +107,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               labelText: 'チップレート',
               border: OutlineInputBorder(),
               suffixText: '円 / 1枚',
-              helperText: '例: 100円/枚、200円/枚',
             ),
             keyboardType: TextInputType.number,
             inputFormatters: [

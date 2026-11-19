@@ -34,11 +34,7 @@ abstract final class ScoreRateMode {
   }
 
   static String scoreRateSuffix(int mode) =>
-      isChip(mode) ? '枚/点' : '円/点';
-
-  static String scoreRateHelper(int mode) => isChip(mode)
-      ? '例: 1点=1枚 → チップレートで円換算'
-      : '例: テンゴ=50、テンピン=100';
+      isChip(mode) ? '枚/円' : '円/点';
 
   static String homeRateLabel({
     required int scoreRate,

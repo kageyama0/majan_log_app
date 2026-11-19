@@ -327,7 +327,7 @@ class _ChipSettlementScreenState
             if (ScoreRateMode.isChip(gd.scoreRateMode)) ...[
               const SizedBox(height: 4),
               Text(
-                '順位点はチップ換算（${gd.scoreRate}枚/点 × ${gd.chipRate}円/枚）',
+                '順位点はチップ換算（${gd.scoreRate}枚/円 × ${gd.chipRate}円/枚）',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade700,

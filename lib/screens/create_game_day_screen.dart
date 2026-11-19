@@ -167,8 +167,6 @@ class _CreateGameDayScreenState
                       border: const OutlineInputBorder(),
                       suffixText:
                           ScoreRateMode.scoreRateSuffix(_scoreRateMode),
-                      helperText:
-                          ScoreRateMode.scoreRateHelper(_scoreRateMode),
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [
