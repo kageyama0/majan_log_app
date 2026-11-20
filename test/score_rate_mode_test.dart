@@ -15,12 +15,12 @@ void main() {
       );
     });
 
-    test('チップ換算は score × scoreRate × chipRate', () {
+    test('チップ換算も score × scoreRate（単一レート）', () {
       expect(
         ScoreRateMode.scoreToYen(
           scorePoints: 45,
-          scoreRate: 1,
-          chipRate: 100,
+          scoreRate: 100,
+          chipRate: 999, // 無視される
           mode: ScoreRateMode.chip,
         ),
         4500,
@@ -31,11 +31,37 @@ void main() {
       expect(
         ScoreRateMode.scoreToYen(
           scorePoints: -20,
-          scoreRate: 1,
-          chipRate: 200,
+          scoreRate: 200,
+          chipRate: 1,
           mode: ScoreRateMode.chip,
         ),
         -4000,
+      );
+    });
+  });
+
+  group('ScoreRateMode.chipDiffToYen', () {
+    test('円換算は chipDiff × chipRate', () {
+      expect(
+        ScoreRateMode.chipDiffToYen(
+          chipDiff: 3,
+          scoreRate: 50,
+          chipRate: 100,
+          mode: ScoreRateMode.yen,
+        ),
+        300,
+      );
+    });
+
+    test('チップ換算は chipDiff × scoreRate', () {
+      expect(
+        ScoreRateMode.chipDiffToYen(
+          chipDiff: 3,
+          scoreRate: 100,
+          chipRate: 999,
+          mode: ScoreRateMode.chip,
+        ),
+        300,
       );
     });
   });
@@ -45,21 +71,32 @@ void main() {
       expect(
         ScoreRateMode.scoreToChips(
           scorePoints: 45,
-          scoreRate: 50,
           mode: ScoreRateMode.yen,
         ),
         0,
       );
     });
 
-    test('チップ換算時は score × scoreRate', () {
+    test('チップ換算時は 1点=1枚', () {
       expect(
         ScoreRateMode.scoreToChips(
           scorePoints: 45,
-          scoreRate: 2,
           mode: ScoreRateMode.chip,
         ),
-        90,
+        45,
+      );
+    });
+  });
+
+  group('ScoreRateMode.homeRateLabel', () {
+    test('チップ換算は単一レートのみ表示', () {
+      expect(
+        ScoreRateMode.homeRateLabel(
+          scoreRate: 100,
+          chipRate: 999,
+          mode: ScoreRateMode.chip,
+        ),
+        '点100枚/円',
       );
     });
   });

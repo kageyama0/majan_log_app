@@ -84,14 +84,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
             selected: {_scoreRateMode},
             onSelectionChanged: (value) {
-              setState(() => _scoreRateMode = value.first);
+              setState(() {
+                final next = value.first;
+                if (ScoreRateMode.isChip(next) &&
+                    ScoreRateMode.isYen(_scoreRateMode)) {
+                  // チップ換算へ切替時はチップレートを単一欄へ引き継ぐ
+                  _scoreRateController.text = _chipRateController.text;
+                }
+                _scoreRateMode = next;
+              });
             },
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _scoreRateController,
             decoration: InputDecoration(
-              labelText: '順位点レート',
+              labelText: ScoreRateMode.isChip(_scoreRateMode)
+                  ? 'チップレート'
+                  : '順位点レート',
               border: const OutlineInputBorder(),
               suffixText: ScoreRateMode.scoreRateSuffix(_scoreRateMode),
             ),
@@ -100,19 +110,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FilteringTextInputFormatter.digitsOnly,
             ],
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _chipRateController,
-            decoration: const InputDecoration(
-              labelText: 'チップレート',
-              border: OutlineInputBorder(),
-              suffixText: '円 / 1枚',
+          if (ScoreRateMode.isYen(_scoreRateMode)) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _chipRateController,
+              decoration: const InputDecoration(
+                labelText: 'チップレート',
+                border: OutlineInputBorder(),
+                suffixText: '円 / 1枚',
+              ),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
             ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
-          ),
+          ],
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _save,
@@ -127,11 +139,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final db = ref.read(databaseProvider);
     final scoreRate =
         int.tryParse(_scoreRateController.text) ?? 50;
-    final chipRate =
-        int.tryParse(_chipRateController.text) ?? 100;
     await db.setSetting('defaultScoreRate', scoreRate);
-    await db.setSetting('defaultChipRate', chipRate);
     await db.setSetting('defaultScoreRateMode', _scoreRateMode);
+    // 円換算のときだけ独立チップレートを保存（チップ換算に戻しても消えない）。
+    if (ScoreRateMode.isYen(_scoreRateMode)) {
+      final chipRate =
+          int.tryParse(_chipRateController.text) ?? 100;
+      await db.setSetting('defaultChipRate', chipRate);
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('保存しました')),

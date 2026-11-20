@@ -190,7 +190,12 @@ class _ChipSettlementScreenState
         chipRate: gd.chipRate,
         mode: gd.scoreRateMode,
       );
-      final chipYen = (chipNet[p.id] ?? 0) * gd.chipRate;
+      final chipYen = ScoreRateMode.chipDiffToYen(
+        chipDiff: chipNet[p.id] ?? 0,
+        scoreRate: gd.scoreRate,
+        chipRate: gd.chipRate,
+        mode: gd.scoreRateMode,
+      );
       balance[p.id] = scoreYen + chipYen;
     }
     return balance;
@@ -327,7 +332,7 @@ class _ChipSettlementScreenState
             if (ScoreRateMode.isChip(gd.scoreRateMode)) ...[
               const SizedBox(height: 4),
               Text(
-                '順位点はチップ換算（${gd.scoreRate}枚/円 × ${gd.chipRate}円/枚）',
+                '順位点はチップ換算（${gd.scoreRate}枚/円・チップ差も同レート）',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade700,
@@ -356,7 +361,12 @@ class _ChipSettlementScreenState
                     mode: gd.scoreRateMode,
                   );
                   final chipNetVal = chipNet[p.id] ?? 0;
-                  final chipYen = chipNetVal * gd.chipRate;
+                  final chipYen = ScoreRateMode.chipDiffToYen(
+                    chipDiff: chipNetVal,
+                    scoreRate: gd.scoreRate,
+                    chipRate: gd.chipRate,
+                    mode: gd.scoreRateMode,
+                  );
                   final venueFee = venueFees[p.id] ?? 0;
                   final total = totalYen[p.id] ?? 0;
                   return DataRow(cells: [

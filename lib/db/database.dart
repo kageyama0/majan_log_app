@@ -112,7 +112,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -130,6 +130,16 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 5) {
             await migrator.addColumn(gameDays, gameDays.scoreRateMode);
+          }
+          if (from < 6) {
+            // チップ換算を単一レート化: 旧 score×scoreRate×chipRate を
+            // score×(scoreRate×chipRate) に畳み込み、chip_rate も同じ値へ。
+            await customStatement(
+              'UPDATE game_days SET '
+              'score_rate = score_rate * chip_rate, '
+              'chip_rate = score_rate * chip_rate '
+              'WHERE score_rate_mode = 1',
+            );
           }
         },
       );

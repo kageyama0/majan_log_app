@@ -153,44 +153,67 @@ class _CreateGameDayScreenState
               ],
               selected: {_scoreRateMode},
               onSelectionChanged: (value) {
-                setState(() => _scoreRateMode = value.first);
+                setState(() {
+                  final next = value.first;
+                  if (ScoreRateMode.isChip(next) &&
+                      ScoreRateMode.isYen(_scoreRateMode)) {
+                    // チップ換算へ切替時はチップ欄の値を単一レートへ引き継ぐ
+                    _scoreRateController.text = _chipRateController.text;
+                  }
+                  _scoreRateMode = next;
+                });
               },
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _scoreRateController,
-                    decoration: InputDecoration(
-                      labelText: '順位点',
-                      border: const OutlineInputBorder(),
-                      suffixText:
-                          ScoreRateMode.scoreRateSuffix(_scoreRateMode),
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                  ),
+            if (ScoreRateMode.isChip(_scoreRateMode))
+              TextField(
+                controller: _scoreRateController,
+                decoration: InputDecoration(
+                  labelText: 'チップ',
+                  border: const OutlineInputBorder(),
+                  suffixText:
+                      ScoreRateMode.scoreRateSuffix(_scoreRateMode),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _chipRateController,
-                    decoration: const InputDecoration(
-                      labelText: 'チップ',
-                      border: OutlineInputBorder(),
-                      suffixText: '円/枚',
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _scoreRateController,
+                      decoration: InputDecoration(
+                        labelText: '順位点',
+                        border: const OutlineInputBorder(),
+                        suffixText:
+                            ScoreRateMode.scoreRateSuffix(_scoreRateMode),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                     ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _chipRateController,
+                      decoration: const InputDecoration(
+                        labelText: 'チップ',
+                        border: OutlineInputBorder(),
+                        suffixText: '円/枚',
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             const SizedBox(height: 16),
             Text(selectionHint,
                 style:
@@ -248,8 +271,10 @@ class _CreateGameDayScreenState
   Future<void> _create(AppDatabase db) async {
     final scoreRate =
         int.tryParse(_scoreRateController.text) ?? 50;
-    final chipRate =
-        int.tryParse(_chipRateController.text) ?? 100;
+    // チップ換算では単一レートを chipRate にもミラー（精算の互換・既存参照用）。
+    final chipRate = ScoreRateMode.isChip(_scoreRateMode)
+        ? scoreRate
+        : (int.tryParse(_chipRateController.text) ?? 100);
 
     final gameDayId = await db.into(db.gameDays).insert(
           GameDaysCompanion.insert(
